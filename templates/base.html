@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titre %}Vinted Auto{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% block tete %}{% endblock %}
+</head>
+<body>
+{% if session.role %}
+<header>
+  <span class="logo">Vinted Auto</span>
+  {% if session.role == 'admin' %}
+  <a href="{{ url_for('ajouter') }}" class="{{ 'actif' if request.endpoint=='ajouter' }}">➕ Coller des liens</a>
+  <a href="{{ url_for('articles') }}" class="{{ 'actif' if request.endpoint=='articles' }}">📋 Articles</a>
+  {% endif %}
+  <a href="{{ url_for('file_photos') }}" class="{{ 'actif' if request.endpoint=='file_photos' }}">📸 À photographier</a>
+  <span class="droite">{{ session.nom }} · <a href="{{ url_for('deconnexion') }}">Se déconnecter</a></span>
+</header>
+{% endif %}
+<main>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+{% endwith %}
+{% block contenu %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

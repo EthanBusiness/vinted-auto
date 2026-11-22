@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titre %}Connexion · Vinted Auto{% endblock %}
+{% block contenu %}
+<div class="carte" style="max-width:380px;margin:60px auto">
+  <h1>Connexion</h1>
+  <form method="post">
+    <label for="u">Identifiant</label>
+    <input type="text" id="u" name="utilisateur" autofocus autocomplete="username">
+    <label for="p">Mot de passe</label>
+    <input type="password" id="p" name="mot_de_passe" autocomplete="current-password">
+    <p><button class="btn" type="submit">Se connecter</button></p>
+  </form>
+</div>
+{% endblock %}

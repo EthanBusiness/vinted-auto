@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titre %}Articles · Vinted Auto{% endblock %}
+{% block tete %}{% if en_cours %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block contenu %}
+<h1>Articles</h1>
+<div class="stats">
+  <div class="stat"><b>{{ total_jour|euros }}</b><span>Coût API aujourd'hui</span></div>
+  <div class="stat"><b>{{ nb_jour }}</b><span>Article(s) traité(s) aujourd'hui</span></div>
+  <div class="stat"><b>{{ (total_jour / nb_jour if nb_jour else 0)|euros }}</b><span>Coût moyen par article</span></div>
+</div>
+<div class="filtres">
+  <a href="{{ url_for('articles') }}" class="{{ 'actif' if not statut }}">Tous</a>
+  {% for code, texte in statuts.items() %}
+    <a href="{{ url_for('articles', statut=code) }}" class="{{ 'actif' if statut==code }}">{{ texte }}</a>
+  {% endfor %}
+</div>
+{% if not articles %}
+  <div class="carte">Aucun article pour l'instant. <a href="{{ url_for('ajouter') }}">Colle tes premiers liens</a>.</div>
+{% else %}
+<table>
+  <tr><th></th><th>Article</th><th class="cacher">Comptes</th><th>Étape</th><th class="cacher">Coût</th></tr>
+  {% for a in articles %}
+  <tr>
+    <td>{% if a.images %}<img src="{{ a.images[0] }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}</td>
+    <td><a href="{{ url_for('fiche_article', article_id=a.id) }}">{{ a.infos.nom or 'Article n°%d' % a.id }}</a>
+        <div class="doux" style="font-size:13px">{{ a.sku or '' }} · ajouté le {{ a.cree_le[:16].replace('T',' à ') }}</div></td>
+    <td class="cacher" style="font-size:13px">{% for c in a.comptes %}{{ c.split('|')[-1] }}{{ ', ' if not loop.last }}{% else %}<span class="doux">à choisir</span>{% endfor %}</td>
+    <td><span class="pastille s-{{ a.statut }}">{{ a.statut_texte }}</span></td>
+    <td class="cacher">{{ a.cout_usd|euros }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

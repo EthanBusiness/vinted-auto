@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titre %}À photographier · Vinted Auto{% endblock %}
+{% block contenu %}
+<h1>À photographier ({{ articles|length }})</h1>
+<p class="doux">La vraie page de ton employée (copier le prompt + déposer les photos) arrive à l'étape 3.</p>
+{% if not articles %}
+  <div class="carte">Rien à photographier pour l'instant 🎉</div>
+{% else %}
+<table>
+  <tr><th></th><th>Article</th></tr>
+  {% for a in articles %}
+  <tr>
+    <td>{% if a.images %}<img src="{{ a.images[0] }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}</td>
+    <td><a href="{{ url_for('fiche_article', article_id=a.id) }}">{{ a.infos.nom or 'Article n°%d' % a.id }}</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}
