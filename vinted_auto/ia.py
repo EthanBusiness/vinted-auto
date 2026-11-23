@@ -173,6 +173,29 @@ def decrire_scene(contenu: bytes, type_image: str):
     return texte.strip().strip("«»\"' .").rstrip(".")[:300]
 
 
+def trier_photos(images: list):
+    """images = [(octets, type)] -> indices des vraies photos de l'article (sans tableau des tailles ni texte)."""
+    import base64
+    contenu = []
+    for i, (octets, typ) in enumerate(images):
+        contenu.append({"type": "text", "text": f"Photo {i} :"})
+        contenu.append({"type": "image", "source": {"type": "base64", "media_type": typ, "data": base64.b64encode(octets).decode()}})
+    contenu.append({"type": "text", "text": (
+        "TRI_PHOTOS. Voici les photos d'une fiche produit Shein. Donne les numéros des photos qui montrent le vêtement lui-même "
+        "(porté par une personne ou posé à plat, vue d'ensemble ou détail du tissu). Exclus tout tableau ou guide des tailles, "
+        "toute image composée surtout de texte ou de chiffres, les schémas de mesures et les nuanciers de couleurs.")})
+    schema = {"type": "object", "additionalProperties": False, "required": ["photos_article"],
+              "properties": {"photos_article": {"type": "array", "items": {"type": "integer"}}}}
+    texte, usd = _appel("tri des photos Shein", max_tokens=300,
+                        output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
+                        messages=[{"role": "user", "content": contenu}])
+    try:
+        ids = json.loads(texte).get("photos_article") or []
+    except ValueError:
+        raise ErreurIA("Réponse illisible pour le tri des photos.")
+    return [i for i in ids if isinstance(i, int) and 0 <= i < len(images)]
+
+
 def tester():
     texte, usd = _appel("test de la clé", max_tokens=1000, output_config={"effort": "low"},
                         messages=[{"role": "user", "content": "Réponds juste : OK"}])

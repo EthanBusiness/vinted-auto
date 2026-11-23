@@ -46,7 +46,7 @@ def gb_raw_data(goods_id="24616628", sn="sz2310071691901000"):
             "goods_id": goods_id, "goods_sn": sn, "goods_name": "SHEIN LUNE Robe Col Surplis Manches Bouffantes À Ruchés",
             "cat_id": "1727", "cate_name": "Robes pour femmes",
             "cateInfos": {"1727": {"category_name": "Robes courtes pour femmes"}},
-            "currentSkcImgInfo": {"spuImages": ["//img.ltwebstatic.com/images3_spmp/2023/10/13/aa/tableau01.jpg"], "skcImages": [img, img2]},
+            "currentSkcImgInfo": {"spuImages": ["//img.ltwebstatic.com/images3_spmp/2023/10/13/aa/tableau01.jpg"], "skcImages": [img, "//img.ltwebstatic.com/images3_spmp/2023/10/13/bb/guide02.jpg", img2]},
             "productDescriptionInfo": {"goods_desc": "", "productDetails": [
                 {"attr_name": "Couleur", "attr_value": "Fushia"}, {"attr_name": "Encolure", "attr_value": "Col en V"},
                 {"attr_name": "Type de manches", "attr_value": "Manches bishop"}, {"attr_name": "Détails", "attr_value": "Plissé, Froncé"},
@@ -74,7 +74,12 @@ def page_shein(goods_id, sn):
 def reponse_claude(corps):
     texte_user = json.dumps(corps.get("messages", []), ensure_ascii=False)
     fmt = (corps.get("output_config") or {}).get("format")
-    if fmt:
+    if fmt and "TRI_PHOTOS" in texte_user:
+        import base64
+        photos = [b for b in corps["messages"][0]["content"] if b.get("type") == "image"]
+        garder = [i for i, b in enumerate(photos) if b"guide02" not in base64.b64decode(b["source"]["data"])]
+        texte = json.dumps({"photos_article": garder})
+    elif fmt:
         m = re.search(r"Nombre d'annonces à rédiger : (\d+)", texte_user)
         n = int(m.group(1)) if m else 1
         res = {
