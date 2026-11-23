@@ -1,9 +1,11 @@
 @echo off
 REM Garde toujours la fenetre ouverte, meme en cas d'erreur
-if not "%~1"=="--garder" (
-  cmd /k ""%~f0" --garder"
-  exit /b
-)
+REM (marche aussi si le dossier contient des espaces ou des parentheses)
+if "%~1"=="--garder" goto debut
+cmd /k call "%~f0" --garder
+exit /b
+
+:debut
 title Vinted Auto
 cd /d "%~dp0"
 
