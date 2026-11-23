@@ -1,50 +1,65 @@
 @echo off
-chcp 65001 >nul
+REM Garde toujours la fenetre ouverte, meme en cas d'erreur
+if not "%~1"=="--garder" (
+  cmd /k ""%~f0" --garder"
+  exit /b
+)
 title Vinted Auto
 cd /d "%~dp0"
 
 echo.
 echo  === Vinted Auto ===
+echo  Dossier : %CD%
 echo.
 
-REM 1) Premiere fois : creer l'environnement Python
-if not exist ".venv\Scripts\python.exe" (
-  echo  Premiere installation, ca peut prendre 1 a 2 minutes...
-  py -3 -m venv .venv 2>nul || python -m venv .venv
-  if not exist ".venv\Scripts\python.exe" (
-    echo.
-    echo  ERREUR : Python est introuvable.
-    echo  Installe Python depuis python.org en cochant "Add python.exe to PATH", puis relance.
-    pause
-    exit /b 1
-  )
-)
+if exist ".venv\Scripts\python.exe" goto installer_outils
 
-REM 2) Installer / mettre a jour les outils necessaires
-".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r requirements.txt
-if errorlevel 1 (
-  echo.
-  echo  ERREUR pendant l'installation des outils. Verifie ta connexion internet et relance.
-  pause
-  exit /b 1
-)
+echo  Premiere installation : creation de l'environnement Python...
+py -3 -m venv .venv
+if exist ".venv\Scripts\python.exe" goto installer_outils
+python -m venv .venv
+if exist ".venv\Scripts\python.exe" goto installer_outils
+echo.
+echo  ERREUR : Python est introuvable.
+echo  Installe Python depuis python.org en cochant "Add python.exe to PATH",
+echo  redemarre le PC, puis relance lancer.bat.
+goto fin
 
-REM 3) Premiere fois : creer le fichier de reglages .env
-if not exist ".env" (
-  copy ".env.example" ".env" >nul
-  echo.
-  echo  Le fichier de reglages .env vient d'etre cree.
-  echo  Il va s'ouvrir dans le Bloc-notes : remplis-le, enregistre (Ctrl+S), ferme-le,
-  echo  puis relance lancer.bat.
-  echo.
-  pause
-  notepad ".env"
-  exit /b 0
-)
+:installer_outils
+echo  Installation des outils necessaires, 1 a 2 minutes la premiere fois...
+".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
+if errorlevel 1 goto erreur_pip
 
-REM 4) Lancer le site et ouvrir le navigateur
+if exist ".env" goto lancer
+copy ".env.example" ".env" >nul
+echo.
+echo  ------------------------------------------------------------
+echo   Le fichier de reglages .env vient d'etre cree.
+echo   Il va s'ouvrir dans le Bloc-notes.
+echo   1. Remplis ton mot de passe et tes cles.
+echo   2. Enregistre avec Ctrl+S, puis ferme le Bloc-notes.
+echo   3. Relance lancer.bat.
+echo  ------------------------------------------------------------
+echo.
+start "" notepad ".env"
+goto fin
+
+:lancer
+echo.
+echo  Demarrage du site...
 start "" "http://localhost:8000"
 ".venv\Scripts\python.exe" app.py
 echo.
-echo  Le site s'est arrete.
-pause
+echo  Le site s'est arrete. Si un message d'erreur est affiche au-dessus,
+echo  fais une capture d'ecran de cette fenetre.
+goto fin
+
+:erreur_pip
+echo.
+echo  ERREUR pendant l'installation des outils (voir les messages au-dessus).
+echo  Verifie ta connexion internet, puis fais une capture d'ecran de cette fenetre.
+goto fin
+
+:fin
+echo.
+echo  Tu peux fermer cette fenetre.
