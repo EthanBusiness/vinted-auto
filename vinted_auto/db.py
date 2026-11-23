@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS comptes (
     fond_fichier TEXT DEFAULT '', fond_description TEXT DEFAULT '',
     modele_fichier TEXT DEFAULT '', modele_description TEXT DEFAULT '',
     prompt_fond TEXT DEFAULT '', prompt_modele TEXT DEFAULT '',
+    scene_fichier TEXT DEFAULT '', scene_description TEXT DEFAULT '', prompt_scene TEXT DEFAULT '',
     prochain_creneau REAL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS couts (
@@ -88,9 +89,20 @@ def cx() -> sqlite3.Connection:
     return c
 
 
+# Colonnes ajoutées après la première version (les anciennes bases sont complétées au démarrage)
+COLONNES_AJOUTEES = {
+    "comptes": {"scene_fichier": "TEXT DEFAULT ''", "scene_description": "TEXT DEFAULT ''", "prompt_scene": "TEXT DEFAULT ''"},
+}
+
+
 def init():
     with _verrou_ecriture:
         cx().executescript(SCHEMA)
+        for table, cols in COLONNES_AJOUTEES.items():
+            existantes = {r[1] for r in cx().execute(f"PRAGMA table_info({table})")}
+            for nom, typ in cols.items():
+                if nom not in existantes:
+                    cx().execute(f"ALTER TABLE {table} ADD COLUMN {nom} {typ}")
         for k, v in REGLAGES_DEFAUT.items():
             cx().execute("INSERT OR IGNORE INTO reglages(cle, valeur) VALUES (?, ?)", (k, v))
         cx().commit()
@@ -159,4 +171,9 @@ def ajouter_cout(usd, quoi):
 
 def cout_du_jour_usd():
     r = q1("SELECT COALESCE(SUM(usd), 0) AS s FROM couts WHERE jour = date('now', 'localtime')")
+    return r["s"] if r else 0.0
+
+
+def cout_du_mois_usd():
+    r = q1("SELECT COALESCE(SUM(usd), 0) AS s FROM couts WHERE substr(jour, 1, 7) = strftime('%Y-%m', 'now', 'localtime')")
     return r["s"] if r else 0.0

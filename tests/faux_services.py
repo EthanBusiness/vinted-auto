@@ -119,6 +119,9 @@ class H(BaseHTTPRequestHandler):
             sn = "sz2310071691901000" if m.group(1) == "24616628" else "sz" + m.group(1)
             return self.rep(200, brut=page_shein(m.group(1), sn).encode(), type_c="text/html; charset=utf-8")
         p = u.path
+        if p.startswith("/images"):   # fausses photos produit Shein (img.ltwebstatic.com)
+            JOURNAL.setdefault("images", []).append(p)
+            return self.rep(200, brut=b"\xff\xd8\xff\xe0" + p.encode() + b"\x00" * 2000, type_c="image/jpeg")
         if p.startswith("/api/pub/public_api/v1"):
             if self.headers.get("Authorization") != "Bearer scal_live_test":
                 return self.rep(401, {"error": {"code": "cle_invalide", "message": "Clé inconnue ou révoquée."}})

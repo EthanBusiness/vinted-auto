@@ -61,7 +61,8 @@ def lien_propre(lien: str) -> str:
     return lien.split("#")[0].split("?")[0] if "shein." in lien else lien
 
 
-def importer(texte: str, comptes: list):
+def importer(texte, comptes: list, tailles=None):
+    """texte = « lien [taille] » par ligne ; tailles = liste optionnelle (une par lien, choisie dans le site)."""
     lignes = analyser_lignes(texte)
     if not lignes:
         raise ValueError("Aucun lien trouvé. Colle un lien Shein par ligne.")
@@ -69,9 +70,12 @@ def importer(texte: str, comptes: list):
         raise ValueError("Coche au moins un compte Vinted.")
     if not all("shein." in l for l, _ in lignes):
         raise ValueError("Seuls les liens Shein sont acceptés (un par ligne).")
+    tailles = list(tailles or [])
     ids = []
     now = time.time()
-    for lien, taille in lignes:
+    for i, (lien, taille) in enumerate(lignes):
+        if i < len(tailles) and str(tailles[i] or "").strip():
+            taille = str(tailles[i]).strip()[:20]
         pid = db.ex("INSERT INTO produits(lien, goods_id, taille_demandee, statut, cree, maj) VALUES (?, ?, ?, 'lecture', ?, ?)",
                     (lien_propre(lien), goods_id_de(lien), taille, now, now))
         for c in comptes:
@@ -216,14 +220,47 @@ def generer(produit_id: int, annonce_ids=None):
             db.maj("annonces", a["id"], statut=statut)
 
 
+# Noms des mesures Shein (fiche en anglais) -> français
+MESURES_FR = {
+    "length": "Longueur", "bust": "Tour de poitrine", "waist": "Tour de taille", "hip": "Tour de hanches",
+    "hips": "Tour de hanches", "shoulder": "Carrure", "shoulders": "Carrure", "sleeve length": "Longueur des manches",
+    "sleeve": "Longueur des manches", "cuff": "Poignet", "bicep length": "Tour de bras", "bicep": "Tour de bras",
+    "thigh": "Tour de cuisse", "inseam": "Entrejambe", "rise": "Hauteur de taille", "hem width": "Largeur du bas",
+    "hem": "Largeur du bas", "leg opening": "Bas de jambe", "under bust": "Sous-poitrine", "top length": "Longueur du haut",
+    "bottoms length": "Longueur du bas", "skirt length": "Longueur de jupe", "dress length": "Longueur de robe",
+    "neckline": "Encolure", "back length": "Longueur dos", "cup": "Bonnet", "band": "Tour de dessous de poitrine",
+    "waist size": "Tour de taille", "hip size": "Tour de hanches", "front length": "Longueur devant",
+}
+
+
+def _mesure_cm(v: str) -> str:
+    """« 34 cm » -> « 34 cm » ; « 13.4 inch » -> « 34 cm »."""
+    v = str(v).strip()
+    m = re.search(r"(\d+(?:[.,]\d+)?)(?:\s*-\s*(\d+(?:[.,]\d+)?))?\s*(cm|inch|in|\")", v, re.I)
+    if not m:
+        return v
+    nombres = [float(x.replace(",", ".")) for x in m.groups()[:2] if x]
+    if m.group(3).lower() != "cm":
+        nombres = [round(n * 2.54) for n in nombres]
+    texte = " - ".join(f"{n:.1f}".rstrip("0").rstrip(".").replace(".", ",") for n in nombres)
+    return f"{texte} cm"
+
+
 def mesures_texte(fiche: dict, taille: str) -> str:
+    """Mesures de la taille choisie, en français, une par ligne."""
     if not taille:
         return ""
     lettre = taille_lettre(taille)
     for t in fiche.get("tailles", []):
         if taille_lettre(t.get("taille", "")) == lettre and t.get("mesures"):
-            parts = [f"{k.strip().lower()} {str(v).strip()}" for k, v in t["mesures"].items() if str(v).strip()]
-            return ", ".join(parts[:7])
+            lignes = []
+            for k, v in t["mesures"].items():
+                if not str(v).strip():
+                    continue
+                nom = k.strip().rstrip(":").strip()
+                nom = MESURES_FR.get(nom.lower(), nom[:1].upper() + nom[1:])
+                lignes.append(f"- {nom} : {_mesure_cm(v)}")
+            return "\n".join(lignes[:8])
     return ""
 
 
@@ -255,7 +292,7 @@ def appliquer_taille(annonce_id: int, taille: str, details=None):
         info = f"Taille : {lettre}"
         m = mesures_texte(fiche, taille)
         if m:
-            info += f"\nMesures ({lettre}) : {m}"
+            info += f"\n\nMesures de la taille {lettre} :\n{m}"
         lignes.append(info)
     if tags:
         lignes.append(" ".join(tags))
@@ -274,48 +311,75 @@ def refaire_prompts(annonce_id: int):
     db.maj("annonces", annonce_id, prompt_face=face, prompt_dos=dos)
 
 
+NB_IMAGES_ARTICLE = 4   # photos produit Shein jointes dans Gemini (après la scène)
+
+CADRAGE = ("CADRAGE SERRÉ, pour que l'article saute aux yeux : photo verticale 3:4 prise au smartphone à hauteur de poitrine, "
+           "à environ un mètre. Le visage est coupé juste sous le menton (on ne voit ni les yeux ni le nez). L'article remplit "
+           "presque toute l'image, en hauteur comme en largeur : pour un haut, cadre du menton jusqu'aux hanches ; pour une robe, "
+           "une jupe ou un ensemble, du menton jusqu'un peu sous l'ourlet ; pour un pantalon ou une robe longue, du menton jusqu'aux "
+           "chevilles. Le décor n'apparaît qu'autour de la silhouette, légèrement flou.")
+
+
+def images_article(fiche: dict) -> list:
+    return (fiche.get("images") or [])[:NB_IMAGES_ARTICLE]
+
+
 def construire_prompts(analyse: dict, fiche: dict, compte: dict):
-    """Deux prompts Gemini (face / dos) qui reprennent le fond et le modèle du compte."""
-    n = 1
-    pieces, consignes = [], []
-    if compte.get("fond_fichier"):
-        pieces.append(f"Image {n} = le DÉCOR à utiliser")
-        consignes.append(f"Utilise exactement le décor de l'image {n} : même pièce, mêmes meubles, même lumière, même angle.")
-        n += 1
+    """Deux prompts Gemini (face / dos) qui reprennent la scène (décor + femme) du compte."""
+    nb = len(images_article(fiche)) or 1
+    consignes = []
+    if compte.get("scene_fichier"):
+        pieces = f"Image 1 = la SCÈNE du compte (la femme dans son décor) ; images 2 à {nb + 1} = l'ARTICLE (photos produit)"
+        consignes.append("Garde exactement la scène de l'image 1 : même décor, même lumière, même femme (même peau, même silhouette, "
+                         "mêmes cheveux, mêmes bijoux). Remplace UNIQUEMENT sa tenue par l'article.")
+        if compte.get("scene_description"):
+            consignes.append(f"Rappel de la scène : {compte['scene_description']}.")
+        debut = 2
     else:
-        decor = compte.get("fond_description") or "une chambre simple et lumineuse, murs blancs, parquet clair, une plante"
-        consignes.append(f"Décor : {decor}.")
-    if compte.get("modele_fichier"):
-        pieces.append(f"Image {n} = la FEMME à utiliser")
-        consignes.append(f"La femme est exactement celle de l'image {n} : même visage, même coiffure, même couleur de cheveux, même silhouette.")
-        n += 1
-    else:
-        femme = compte.get("modele_description") or "une femme européenne d'une vingtaine d'années, naturelle, cheveux châtains"
-        consignes.append(f"La femme : {femme}.")
-    if compte.get("modele_description") and compte.get("modele_fichier"):
-        consignes.append(f"Rappel du modèle : {compte['modele_description']}.")
-    pieces.append(f"Image {n} et suivantes = l'ARTICLE à reproduire (photos produit)")
+        n, morceaux = 1, []
+        if compte.get("fond_fichier"):
+            morceaux.append(f"Image {n} = le DÉCOR")
+            consignes.append(f"Utilise exactement le décor de l'image {n} (même lieu, même lumière).")
+            n += 1
+        if compte.get("modele_fichier"):
+            morceaux.append(f"Image {n} = la FEMME")
+            consignes.append(f"La femme est exactement celle de l'image {n} (même peau, même silhouette, mêmes cheveux).")
+            n += 1
+        if not compte.get("fond_fichier"):
+            decor = (compte.get("scene_description") or compte.get("fond_description")
+                     or "une chambre simple et lumineuse, murs blancs, parquet clair, une plante")
+            consignes.append(f"Décor et femme : {decor}." if compte.get("scene_description") else f"Décor : {decor}.")
+        if not compte.get("modele_fichier") and not compte.get("scene_description"):
+            femme = compte.get("modele_description") or "une femme européenne d'une vingtaine d'années, naturelle, cheveux châtains"
+            consignes.append(f"La femme : {femme}.")
+        debut = n
+        morceaux.append(f"images {n} à {n + nb - 1} = l'ARTICLE (photos produit)" if nb > 1 else f"image {n} = l'ARTICLE (photo produit)")
+        pieces = " ; ".join(morceaux)
     article = analyse.get("description_visuelle") or fiche.get("titre", "")
     couleur = fiche.get("couleur")
 
     def prompt(vue):
         if vue == "face":
-            pose = ("Elle est debout, vue de FACE, en pied (de la tête aux genoux au minimum), posture naturelle et détendue, "
-                    "une main le long du corps, regard vers l'objectif ou légèrement de côté.")
+            pose = ("Vue de FACE : elle est debout, droite et naturelle, bras détendus le long du corps, mains visibles qui ne "
+                    "cachent pas l'article.")
         else:
-            pose = ("Elle est debout, vue de DOS (elle tourne le dos à l'objectif, tête légèrement tournée), en pied, "
-                    "pour montrer tout le dos de l'article. Utilise la photo de dos de l'article si elle est jointe.")
+            pose = ("Vue de DOS : elle tourne le dos à l'objectif, même cadrage serré (de la nuque jusqu'en bas de l'article), "
+                    "cheveux ramenés devant l'épaule s'ils cachent le dos de l'article. Sers-toi de la photo de dos de l'article "
+                    "si elle est jointe ; sinon, déduis le dos logiquement sans inventer de détail.")
         return "\n".join([
-            "Crée une photo réaliste d'une femme qui porte l'article, pour une annonce Vinted.",
-            "Images jointes : " + " ; ".join(pieces) + ".",
+            "Crée UNE photo réaliste pour une annonce Vinted : une femme qui porte l'article.",
+            f"Images jointes : {pieces}. (Si l'ordre a changé : la scène est la photo avec la femme dans le décor, "
+            f"les autres sont les photos produit de l'article.)",
             *consignes,
+            CADRAGE,
             pose,
             f"L'article : {article}" + (f" Couleur : {couleur}." if couleur else ""),
-            "TRÈS IMPORTANT : reproduis l'article EXACTEMENT comme sur les photos produit : même couleur (même nuance), même coupe, "
-            "même longueur, même motif, même matière, mêmes détails (boutons, coutures, volants, col, manches). N'ajoute et ne retire rien. "
-            "L'article doit être entièrement visible, ni caché par les cheveux, ni par un sac ou une veste.",
-            "Rendu : photo prise au smartphone par une amie, lumière naturelle douce, légère imperfection naturelle, pas de rendu studio "
-            "ni retouché, format portrait 3:4, sans texte, sans logo, sans filigrane.",
+            "TRÈS IMPORTANT : reproduis l'article EXACTEMENT comme sur les photos produit (images " + f"{debut}+" + ") : même couleur "
+            "(même nuance), même coupe, même longueur, même motif, même matière, mêmes détails (boutons, coutures, volants, col, "
+            "manches, ceinture). N'ajoute et ne retire rien. L'article doit être entièrement visible, ni caché par les cheveux, "
+            "ni par un sac ou une veste.",
+            "Rendu : vraie photo prise à l'iPhone, lumière naturelle douce, légère imperfection naturelle, pas de rendu studio ni "
+            "retouché, sans texte, sans logo, sans filigrane.",
         ])
 
     return prompt("face"), prompt("dos")
@@ -334,6 +398,9 @@ def enregistrer_photo(annonce_id: int, vue: str, contenu: bytes, ext: str):
     nom = f"annonce{annonce_id}-{vue}-{int(time.time())}.{ext}"
     (IMAGES / nom).write_bytes(contenu)
     db.maj("annonces", annonce_id, **{f"photo_{vue}": nom, "photos_en_ligne": []})
+    a = db.q1("SELECT * FROM annonces WHERE id = ?", (annonce_id,))
+    if a["photo_face"] and a["photo_dos"] and a["statut"] == "a_photographier":
+        valider_photos(annonce_id)   # les 2 photos sont là : rien d'autre à faire pour l'employée
 
 
 def valider_photos(annonce_id: int):

@@ -97,6 +97,22 @@ def matieres_ids(noms, details_catalogue: dict) -> list:
     return ids[:3]
 
 
+def arrondi_psy(prix: float, mini: float = 0, marge: float = 2) -> float:
+    """Prix « psychologique » en ,90 : 39,90 plutôt que 40,90.
+    On cherche d'abord un prix en 9,90 (19,90 / 29,90 / 39,90…) à 2 € près, puis en 4,90 (14,90 / 24,90…),
+    sinon le ,90 le plus proche. Jamais en dessous du prix minimum."""
+    def ok(v):
+        return v >= mini - 1e-9 and abs(v - prix) <= marge + 1e-9
+    for fin in (9.9, 4.9):
+        cands = [d * 10 + fin for d in range(int((prix - marge) // 10) - 1, int((prix + marge) // 10) + 2)]
+        cands = [v for v in cands if v > 0 and ok(v)]
+        if cands:
+            return round(min(cands, key=lambda v: (abs(v - prix), v)), 2)
+    bas = math.floor(prix) - 0.1 if prix - math.floor(prix) < 0.9 else math.floor(prix) + 0.9
+    cands = [v for v in (bas, bas + 1) if v >= mini - 1e-9] or [math.ceil(mini - 0.9) + 0.9]
+    return round(min(cands, key=lambda v: (abs(v - prix), v)), 2)
+
+
 def prix_vente(prix_shein: float, reglages: dict) -> float:
     try:
         coef = float(str(reglages.get("prix_coef", "1.6")).replace(",", "."))
@@ -105,8 +121,8 @@ def prix_vente(prix_shein: float, reglages: dict) -> float:
     except ValueError:
         coef, ajout, mini = 1.6, 2, 6
     if not prix_shein:
-        return mini
-    return float(max(mini, math.ceil(prix_shein * coef + ajout)))
+        return arrondi_psy(mini, mini)
+    return arrondi_psy(max(mini, prix_shein * coef + ajout), mini)
 
 
 def lire_prix(texte) -> float:
