@@ -16,7 +16,7 @@ var EN = {
   "📂 Ouvrir les images": "📂 Open the images", "⬇️ Télécharger les images (ZIP)": "⬇️ Download the images (ZIP)",
   "Scène du compte seulement": "Account scene only", "ou en ZIP": "or as ZIP",
   "Les photos de cet article sont déjà téléchargées (pour un autre compte) : prends seulement la scène de ce compte.": "This item's photos are already downloaded (for another account): just get this account's scene.",
-  "Dans Gemini : clique sur ＋, choisis les fichiers, sélectionne-les tous (Ctrl+A) puis Ouvrir.": "In Gemini: click ＋, choose files, select them all (Ctrl+A) then Open.",
+  "Dans Gemini : clique sur ＋, choisis les fichiers, sélectionne-les tous (Ctrl+A) puis Ouvrir. L'ordre n'a pas d'importance.": "In Gemini: click ＋, choose files, select them all (Ctrl+A) then Open. The order doesn't matter.",
   "Photo de FACE": "FRONT photo", "Photo de DOS": "BACK photo", "📋 Copier le prompt": "📋 Copy the prompt", "Voir le prompt": "Show the prompt",
   "Glisse la photo ici": "Drop the photo here", "ou clique, ou Ctrl+V": "or click, or Ctrl+V",
   "🔁 Refaire les photos": "🔁 Redo the photos", "Terminé. Merci !": "Done. Thank you!",
@@ -468,7 +468,7 @@ function blocPhotos(a) {
     '<h3>① ' + T("Images à mettre dans Gemini") + '</h3><div class="images-compte">' + vignettes + "</div>" +
     (envoyee ? "" : '<div class="ligne" style="margin-top:8px">' + boutons + "</div>" +
       (deja ? '<p class="aide ok">' + T("Les photos de cet article sont déjà téléchargées (pour un autre compte) : prends seulement la scène de ce compte.") + "</p>" : "") +
-      '<p class="aide">' + T("Dans Gemini : clique sur ＋, choisis les fichiers, sélectionne-les tous (Ctrl+A) puis Ouvrir.") + " " + T("Modèle Gemini : outil « Créer des images » 🍌 avec le modèle « Pro » (Nano Banana Pro).") + "</p>") +
+      '<p class="aide">' + T("Dans Gemini : clique sur ＋, choisis les fichiers, sélectionne-les tous (Ctrl+A) puis Ouvrir. L'ordre n'a pas d'importance.") + " " + T("Modèle Gemini : outil « Créer des images » 🍌 avec le modèle « Pro » (Nano Banana Pro).") + "</p>") +
     '<div class="grille2" style="margin-top:6px">' + etape("②", "face", "Photo de FACE") + etape("③", "dos", "Photo de DOS") + "</div>" +
     (envoyee ? "" : '<p class="aide">' + T("Astuce : dans Gemini, clic droit sur la photo › Copier l'image, puis passe la souris sur la zone et fais Ctrl+V.") + "</p>" +
       ((a.photo_face || a.photo_dos) ? '<div class="ligne"><button data-act="refaire">' + T("🔁 Refaire les photos") + "</button></div>" : "")) +
@@ -567,7 +567,7 @@ function carteCompte(c) {
     '<button data-gen="scene" style="margin-top:6px">Générer le prompt</button>' +
     (c.prompt_scene ? '<div class="prompt" style="margin-top:6px">' + esc(c.prompt_scene) + '</div><button data-cpp="scene" class="principal">📋 Copier ce prompt</button>' : "") +
     "<p class=\"aide\">Colle ce prompt dans Gemini (outil « Créer des images », modèle « Pro »), télécharge l'image, puis glisse-la dans la zone à gauche.</p>" +
-    "<label>Description courte de la scène (facultatif)</label>" +
+    "<label>Ce qu'on voit sur la scène (rempli par l'IA quand tu déposes l'image, modifiable)</label>" +
     '<textarea rows="2" data-desc="scene_description" placeholder="ex : terrasse en bois, haie verte ; femme fine, peau claire, cheveux châtains, bracelets fins">' + esc(c.scene_description) + "</textarea>" +
     '<button data-save>💾 Enregistrer la description</button></div></div></div>';
 }

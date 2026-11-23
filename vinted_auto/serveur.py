@@ -68,6 +68,23 @@ def json_annonce(a: dict, detail=False) -> dict:
     return d
 
 
+def decrire_scenes_manquantes():
+    """Scènes déposées avant la version 3.2 : l'IA écrit ce qu'on y voit (pour que Gemini la reconnaisse)."""
+    for c in db.q("SELECT * FROM comptes WHERE scene_fichier != '' AND scene_description = ''"):
+        f = IMAGES / c["scene_fichier"]
+        if not f.is_file():
+            continue
+        ext = f.suffix.lower().lstrip(".")
+        try:
+            desc = ia.decrire_scene(f.read_bytes(), {"png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg"))
+        except ia.ErreurIA:
+            return
+        if desc:
+            db.ex("UPDATE comptes SET scene_description = ? WHERE id = ?", (desc, c["id"]))
+            for a in db.q("SELECT id FROM annonces WHERE compte_id = ? AND statut IN ('a_photographier', 'prete', 'echec') AND titre_base != ''", (c["id"],)):
+                atelier.refaire_prompts(a["id"])
+
+
 def copier_extension():
     try:
         if EXTENSION_DOSSIER.exists():
@@ -526,6 +543,13 @@ def r_compte_image(h, id_, quoi):
         nom = f"compte-{re.sub(r'[^A-Za-z0-9_-]', '', c['id'])[:40]}-{quoi}-{int(time.time())}.{TYPES_IMAGES[type_c]}"
         (IMAGES / nom).write_bytes(contenu)
         db.ex(f"UPDATE comptes SET {quoi}_fichier = ? WHERE id = ?", (nom, c["id"]))
+        if quoi == "scene":
+            try:   # l'IA décrit la scène : Gemini la reconnaîtra par son contenu, quel que soit l'ordre des images
+                desc = ia.decrire_scene(contenu, "image/jpeg" if type_c == "image/jpg" else type_c)
+                if desc:
+                    db.ex("UPDATE comptes SET scene_description = ? WHERE id = ?", (desc, c["id"]))
+            except ia.ErreurIA:
+                pass
     _rafraichir_prompts(c["id"])
     h.json(_compte(id_))
 
@@ -682,6 +706,8 @@ def main():
     SERVEUR["s"] = s
     stop = threading.Event()
     threading.Thread(target=atelier.boucle_suivi, args=(stop,), daemon=True).start()
+    if config.get("ANTHROPIC_API_KEY"):
+        atelier.lancer(decrire_scenes_manquantes)
     atelier.reprendre_au_demarrage()
     if db.q1("SELECT COUNT(*) AS n FROM comptes")["n"] == 0 and config.get("SCALENCY_API_KEY"):
         atelier.lancer(synchroniser_comptes)
