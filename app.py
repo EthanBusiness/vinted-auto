@@ -248,6 +248,21 @@ if __name__ == "__main__":
     from waitress import serve
 
     port = int(os.getenv("PORT", "8000") or 8000)
+
+    def ouvrir_navigateur():
+        # Attend que le site réponde avant d'ouvrir le navigateur
+        import socket
+        import webbrowser
+
+        for _ in range(60):
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=1):
+                    break
+            except OSError:
+                time.sleep(0.5)
+        webbrowser.open(f"http://localhost:{port}")
+
+    threading.Thread(target=ouvrir_navigateur, daemon=True).start()
     print(f"\n  Site lancé : ouvre http://localhost:{port} dans ton navigateur.")
     print("  Pour l'arrêter : ferme cette fenêtre.\n")
     serve(app, host="127.0.0.1", port=port, threads=8)

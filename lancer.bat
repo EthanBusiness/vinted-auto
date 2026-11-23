@@ -49,7 +49,6 @@ goto fin
 :lancer
 echo.
 echo  Demarrage du site...
-start "" "http://localhost:8000"
 ".venv\Scripts\python.exe" app.py
 echo.
 echo  Le site s'est arrete. Si un message d'erreur est affiche au-dessus,
