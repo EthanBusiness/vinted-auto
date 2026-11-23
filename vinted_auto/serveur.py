@@ -373,6 +373,12 @@ def r_images_ouvrir(h, id_):
     h.json({"ok": True, "dossier": str(cible), "fichiers": sorted(f.name for f in cible.iterdir())})
 
 
+def r_retirer_image(h, pid):
+    d = h.corps_json()
+    atelier.retirer_image(int(pid), str(d.get("url") or ""), bool(d.get("remettre")))
+    h.json({"ok": True})
+
+
 def r_valider_photos(h, id_):
     atelier.valider_photos(int(id_))
     h.json(json_annonce(_annonce(id_), detail=True))
@@ -668,6 +674,7 @@ ROUTES = [
     ("GET", r"/api/a-lire", r_a_lire, ADMIN),
     ("POST", rf"/api/shein/{N}", r_fiche, ADMIN),
     ("POST", rf"/api/produits/{N}/relire", r_relire, ADMIN),
+    ("POST", rf"/api/produits/{N}/retirer-image", r_retirer_image, TOUS),
     ("POST", r"/api/shein/brouillon", r_brouillon, ADMIN),
     ("GET", rf"/api/brouillons/{N}", r_brouillon_lire, ADMIN),
     ("POST", rf"/api/brouillons/{N}/valider", r_brouillon_valider, ADMIN),

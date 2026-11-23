@@ -31,6 +31,7 @@ var EN = {
   "Astuce : dans Gemini, clic droit sur la photo › Copier l'image, puis passe la souris sur la zone et fais Ctrl+V.": "Tip: in Gemini, right-click the photo › Copy image, then hover the drop zone and press Ctrl+V.",
   "… et": "… and", "autres après celles-ci.": "more after these.", "Afficher la suite": "Show more",
   "Le prompt est en français : Gemini le comprend très bien.": "The prompt is in French: Gemini understands it perfectly.",
+  "Retirer cette image": "Remove this image", "Image retirée ✔": "Image removed ✔",
   "Image": "Image", "scène": "scene", "article": "item", "Mot de passe incorrect.": "Wrong password.",
 };
 function T(fr) { return LANGUE === "en" && EN[fr] ? EN[fr] : fr; }
@@ -445,7 +446,7 @@ function blocPhotos(a) {
     if (a.fond) { vignettes += '<figure><img src="' + img(a.fond) + '">' + T("Image") + " " + n + " : fond</figure>"; n++; }
     if (a.modele) { vignettes += '<figure><img src="' + img(a.modele) + '">' + T("Image") + " " + n + " : modèle</figure>"; n++; }
   }
-  (a.images_article || []).forEach(function (u, i) { vignettes += '<figure><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" referrerpolicy="no-referrer"></a>' + T("Image") + " " + (n + i) + " : " + T("article") + "</figure>"; });
+  (a.images_article || []).forEach(function (u, i) { vignettes += '<figure class="retirable"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" referrerpolicy="no-referrer"></a>' + (envoyee ? "" : '<button class="croix" data-retirer="' + esc(u) + '" title="' + T("Retirer cette image") + '">✕</button>') + T("Image") + " " + (n + i) + " : " + T("article") + "</figure>"; });
   var deja = dejaTelecharge(a.produit_id) && (a.scene || a.fond || a.modele);
   var zip = "/api/annonces/" + a.id + "/images.zip";
   var boutons = local
@@ -485,6 +486,12 @@ function brancherPhotos(a, recharger, racine) {
         if (b.dataset.quoi === "tout") noterTelecharge(a.produit_id);
         toast(T("Dossier ouvert : sélectionne toutes les images et glisse-les dans Gemini."), 6000); b.disabled = false;
       }).catch(function (e) { toast(e.message, 8000); b.disabled = false; });
+    };
+  });
+  $$("[data-retirer]", r).forEach(function (b) {
+    b.onclick = function (e) {
+      e.preventDefault(); e.stopPropagation(); b.disabled = true;
+      api("POST", "/api/produits/" + a.produit_id + "/retirer-image", { url: b.dataset.retirer }).then(function () { toast(T("Image retirée ✔")); recharger(); }).catch(function (er) { toast(er.message, 6000); b.disabled = false; });
     };
   });
   $$(".img-zip", r).forEach(function (l) { l.addEventListener("click", function () { if (l.dataset.quoi !== "scene") noterTelecharge(a.produit_id); }); });

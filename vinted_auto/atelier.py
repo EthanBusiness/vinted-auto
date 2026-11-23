@@ -187,6 +187,13 @@ def generer(produit_id: int, annonce_ids=None):
             for a in annonces:
                 db.maj("annonces", a["id"], statut="echec", erreur=f"Rédaction : {e}")
             return
+        try:
+            trier_photos(produit_id)
+            p = db.q1("SELECT * FROM produits WHERE id = ?", (produit_id,))
+            fiche = json.loads(p["donnees"] or "{}")
+        except Exception as e:  # noqa : le tri est un plus, jamais bloquant
+            if not isinstance(e, ia.ErreurIA):
+                log_erreur("tri des photos", e)
         analyse = {k: res.get(k) for k in ("description_visuelle", "type_article", "couleurs", "matieres", "categorie_id")}
         cat_ok = {i: c for i, c in cats}
         cat_id = res.get("categorie_id") if res.get("categorie_id") in cat_ok else None
@@ -321,14 +328,62 @@ CADRAGE = ("CADRAGE SERRÉ, pour que l'article saute aux yeux : photo verticale 
            "chevilles. Le décor n'apparaît qu'autour de la silhouette, légèrement flou.")
 
 
-def images_article(fiche: dict) -> list:
-    """Photos de l'article à joindre dans Gemini (jamais le tableau des tailles)."""
+def images_candidates(fiche: dict) -> list:
     imgs = fiche.get("images") or []
     nb = fiche.get("nb_photos_couleur")
     if isinstance(nb, int) and nb >= 2:
-        imgs = imgs[:nb]          # seulement les photos de la couleur (le tableau des tailles est après)
-    imgs = [u for u in imgs if not re.search(r"size|chart|taille|guide", u, re.I)]
-    return imgs[:NB_IMAGES_ARTICLE]
+        imgs = imgs[:nb]          # seulement les photos de la couleur (le tableau des tailles est souvent après)
+    return [u for u in imgs if not re.search(r"size|chart|taille|guide", u, re.I)]
+
+
+def images_article(fiche: dict) -> list:
+    """Photos de l'article à joindre dans Gemini : sans le tableau des tailles (tri par l'IA) ni celles retirées à la main."""
+    exclues = set(fiche.get("images_exclues") or [])
+    return [u for u in images_candidates(fiche) if u not in exclues][:NB_IMAGES_ARTICLE]
+
+
+def trier_photos(produit_id: int):
+    """L'IA regarde les photos Shein et écarte tableaux des tailles et images de texte (une seule fois par article)."""
+    p = db.q1("SELECT * FROM produits WHERE id = ?", (produit_id,))
+    fiche = json.loads(p["donnees"] or "{}")
+    if fiche.get("photos_triees"):
+        return
+    from . import paquet
+    urls = images_candidates(fiche)[:8]
+    images = []
+    for u in urls:
+        try:
+            octets = paquet._image_shein(u)
+        except RuntimeError:
+            return          # pas d'accès aux photos : on garde tout (la croix permet de retirer à la main)
+        typ = "image/png" if octets[:4] == b"\x89PNG" else "image/webp" if octets[8:12] == b"WEBP" else "image/jpeg"
+        images.append((octets, typ))
+    if not images:
+        return
+    gardees = ia.trier_photos(images)
+    if not gardees:           # réponse vide : on ne retire rien plutôt que tout
+        return
+    fiche["images_exclues"] = sorted(set(fiche.get("images_exclues") or []) | {u for i, u in enumerate(urls) if i not in gardees})
+    fiche["photos_triees"] = True
+    db.maj("produits", produit_id, donnees=fiche)
+
+
+def retirer_image(produit_id: int, url: str, remettre=False):
+    p = db.q1("SELECT * FROM produits WHERE id = ?", (produit_id,))
+    if not p:
+        raise ValueError("Article introuvable.")
+    fiche = json.loads(p["donnees"] or "{}")
+    exclues = set(fiche.get("images_exclues") or [])
+    if remettre:
+        exclues.discard(url)
+    else:
+        if url not in (fiche.get("images") or []):
+            raise ValueError("Image inconnue.")
+        exclues.add(url)
+    fiche["images_exclues"] = sorted(exclues)
+    db.maj("produits", produit_id, donnees=fiche)
+    for a in db.q("SELECT id FROM annonces WHERE produit_id = ? AND titre_base != ''", (produit_id,)):
+        refaire_prompts(a["id"])
 
 
 SCENE_DEFAUT = "une femme dans un décor"

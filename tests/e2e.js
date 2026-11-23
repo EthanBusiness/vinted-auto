@@ -135,7 +135,7 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
       [det.prix === 19.9, "prix 10,05 × 1,6 + 2 = 18,08 → arrondi psychologique 19,90 € (" + det.prix + ")"],
       [det.prompt_face.includes("n'importe quel ordre") && det.prompt_face.includes("UNE photo est la SCÈNE du compte : on y voit ") && !/Image \d/.test(det.prompt_face) && det.prompt_face.includes("CADRAGE SERRÉ") && det.prompt_face.includes("Vue de FACE"), "prompt face avec la scène du compte et cadrage serré : " + det.prompt_face],
       [det.prompt_dos.includes("Vue de DOS") && det.prompt_dos.includes("CADRAGE SERRÉ"), "prompt dos"],
-      [det.images_article.length === 2 && !det.images_article.some(u => /tableau/.test(u)), "seulement les 2 photos de la couleur, sans le tableau des tailles : " + det.images_article],
+      [det.images_article.length === 2 && !det.images_article.some(u => /tableau|guide02/.test(u)), "2 photos gardées : le tableau des tailles est écarté (hors couleur + tri par l'IA) : " + det.images_article],
       [det.fiche.images[0] === "https://img.ltwebstatic.com/images3_pi/2023/10/13/02/16971684628a3ce766b3e854f3cedee214437dd785.jpg", "lien photo Shein en pleine taille : " + det.fiche.images[0]],
       [det.fiche.prix === 10.05, "prix Shein lu sur la page (10,05 €)"],
     ];
@@ -180,6 +180,12 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
     if (zipScene.slice(0, 2).toString() !== "PK" || !zipScene.includes("1 - scene compte_un.png") || zipScene.includes("article.jpg")) throw new Error("ZIP scène seule");
     if (!zipTout.includes(`${nbA + 1} - article.jpg`)) throw new Error("ZIP complet");
     ok("Images pour Gemini d'un coup et numérotées (1 = scène, puis l'article) : dossier ouvert ou ZIP, ou la scène seule");
+    // la croix retire une image à la main
+    await page.goto(URL_SITE + "#photos");
+    await page.waitForSelector(`#b${a2.id} [data-retirer]`);
+    await page.click(`#b${a2.id} [data-retirer] >> nth=1`);
+    await jusqua(async () => (await apiGet("/api/annonces/" + a1.id)).images_article.length === nbA - 1, "image retirée");
+    ok("La croix ✕ retire une image de l'article (pour tous ses comptes) ; l'IA a déjà écarté le tableau des tailles");
     // l'autre compte du même article : « scène seulement » est proposé en premier
     await page.goto(URL_SITE + "#photos");
     await page.waitForSelector(`#b${a2.id} .depot`);
