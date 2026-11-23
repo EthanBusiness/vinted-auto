@@ -94,10 +94,12 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
     await jusqua(async () => (await page.$('#c-vt-1 .depot.rempli[data-quoi="scene"] img')), "scène enregistrée");
     await page.fill('#c-vt-1 [data-idee="scene"]', "jardin, terrasse en bois, femme mince");
     await page.click('#c-vt-1 [data-gen="scene"]');
-    await jusqua(async () => (await page.textContent("#c-vt-1")).includes("prompt de test"), "prompt de scène généré");
-    const demandeScene = (await (await fetch(`http://127.0.0.1:${FAUX}/journal`)).json()).anthropic.slice(-1)[0].corps.messages[0].content;
+    await jusqua(async () => (await page.$("#c-vt-1 .prompt")), "prompt de scène généré");
+    const appels = (await (await fetch(`http://127.0.0.1:${FAUX}/journal`)).json()).anthropic;
+    if (!appels.some(x => Array.isArray(x.corps.messages[0].content) && x.corps.messages[0].content[0].type === "image")) throw new Error("la scène n'a pas été décrite par l'IA");
+    const demandeScene = appels.slice(-1)[0].corps.messages[0].content;
     if (!/UNE femme dans SON décor/.test(demandeScene) || !/jardin, terrasse en bois/.test(demandeScene)) throw new Error("demande de scène : " + demandeScene);
-    ok("Compte : une seule scène (fond + modèle ensemble) importée + prompt de scène généré par l'IA");
+    ok("Compte : une seule scène (fond + modèle ensemble) importée, décrite par l'IA (vision) + prompt de scène généré");
     await page.screenshot({ path: path.join(SORTIE, "2-comptes.png"), fullPage: true });
 
     // ---- Ajouter des liens
@@ -131,9 +133,9 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
       [JSON.stringify(det.color_ids) === "[5]", "couleur Rose = 5"],
       [JSON.stringify(det.material_ids) === "[45,53]", "matières polyester + élasthanne " + JSON.stringify(det.material_ids)],
       [det.prix === 19.9, "prix 10,05 × 1,6 + 2 = 18,08 → arrondi psychologique 19,90 € (" + det.prix + ")"],
-      [det.prompt_face.includes("Image 1 = la SCÈNE") && det.prompt_face.includes(`images 2 à ${det.images_article.length + 1} = l'ARTICLE`) && det.prompt_face.includes("CADRAGE SERRÉ") && det.prompt_face.includes("Vue de FACE"), "prompt face avec la scène du compte et cadrage serré : " + det.prompt_face],
+      [det.prompt_face.includes("n'importe quel ordre") && det.prompt_face.includes("UNE photo est la SCÈNE du compte : on y voit ") && !/Image \d/.test(det.prompt_face) && det.prompt_face.includes("CADRAGE SERRÉ") && det.prompt_face.includes("Vue de FACE"), "prompt face avec la scène du compte et cadrage serré : " + det.prompt_face],
       [det.prompt_dos.includes("Vue de DOS") && det.prompt_dos.includes("CADRAGE SERRÉ"), "prompt dos"],
-      [det.images_article.length >= 2 && det.images_article.length <= 4, "2 à 4 photos produit à joindre"],
+      [det.images_article.length === 2 && !det.images_article.some(u => /tableau/.test(u)), "seulement les 2 photos de la couleur, sans le tableau des tailles : " + det.images_article],
       [det.fiche.images[0] === "https://img.ltwebstatic.com/images3_pi/2023/10/13/02/16971684628a3ce766b3e854f3cedee214437dd785.jpg", "lien photo Shein en pleine taille : " + det.fiche.images[0]],
       [det.fiche.prix === 10.05, "prix Shein lu sur la page (10,05 €)"],
     ];

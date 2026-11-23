@@ -25,11 +25,13 @@ function extraireFicheShein() {
     };
     var texte = function (el) { return el ? (el.innerText || "").replace(/\s+/g, " ").trim() : ""; };
 
-    // Photos de la couleur affichée
+    // Photos de la couleur affichée (skcImages). Les spuImages contiennent souvent le tableau des tailles
+    // et des images de texte : on ne s'en sert que s'il manque des photos.
     var img = pi.currentSkcImgInfo || {};
-    var images = (img.skcImages || []).concat(img.spuImages || []);
-    if (!images.length && pi.goods_img) images.push(pi.goods_img);
-    images = uniques(images.map(original)).slice(0, 12);
+    var couleurImgs = uniques((img.skcImages || []).map(original));
+    var images = couleurImgs.concat((img.spuImages || []).map(original));
+    if (!images.length && pi.goods_img) images.push(original(pi.goods_img));
+    images = uniques(images).slice(0, 12);
 
     // Couleur affichée
     var couleur = "";
@@ -99,6 +101,7 @@ function extraireFicheShein() {
       images: images,
       attributs: attributs.slice(0, 60),
       tailles: tailles.slice(0, 30),
+      nb_photos_couleur: couleurImgs.length,
       taille_choisie: choisie,
       description: String(desc.goods_desc || "").replace(/<[^>]+>/g, " ").slice(0, 3000)
     };

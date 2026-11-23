@@ -46,7 +46,7 @@ def gb_raw_data(goods_id="24616628", sn="sz2310071691901000"):
             "goods_id": goods_id, "goods_sn": sn, "goods_name": "SHEIN LUNE Robe Col Surplis Manches Bouffantes À Ruchés",
             "cat_id": "1727", "cate_name": "Robes pour femmes",
             "cateInfos": {"1727": {"category_name": "Robes courtes pour femmes"}},
-            "currentSkcImgInfo": {"spuImages": [], "skcImages": [img, img2]},
+            "currentSkcImgInfo": {"spuImages": ["//img.ltwebstatic.com/images3_spmp/2023/10/13/aa/tableau01.jpg"], "skcImages": [img, img2]},
             "productDescriptionInfo": {"goods_desc": "", "productDetails": [
                 {"attr_name": "Couleur", "attr_value": "Fushia"}, {"attr_name": "Encolure", "attr_value": "Col en V"},
                 {"attr_name": "Type de manches", "attr_value": "Manches bishop"}, {"attr_name": "Détails", "attr_value": "Plissé, Froncé"},

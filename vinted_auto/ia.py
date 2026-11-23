@@ -157,6 +157,22 @@ def prompt_scene(idee: str):
                   output_config={"effort": "low"}, messages=[{"role": "user", "content": demande}])
 
 
+def decrire_scene(contenu: bytes, type_image: str):
+    """Décrit en quelques mots ce qu'on voit sur la scène, pour que Gemini la reconnaisse quel que soit l'ordre."""
+    import base64
+    texte, usd = _appel(
+        "description de la scène", max_tokens=400, output_config={"effort": "low"},
+        messages=[{"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": type_image, "data": base64.b64encode(contenu).decode()}},
+            {"type": "text", "text": "Décris cette photo en une seule phrase courte en français (25 mots maximum), sans phrase "
+                                     "d'introduction, au format : « une femme [cheveux, silhouette] en [tenue avec sa couleur] "
+                                     "[pose], [décor] ». Exemple : une femme mince aux cheveux châtains en robe longue rouge, "
+                                     "debout sur une terrasse en bois devant une haie verte."},
+        ]}],
+    )
+    return texte.strip().strip("«»\"' .").rstrip(".")[:300]
+
+
 def tester():
     texte, usd = _appel("test de la clé", max_tokens=1000, output_config={"effort": "low"},
                         messages=[{"role": "user", "content": "Réponds juste : OK"}])

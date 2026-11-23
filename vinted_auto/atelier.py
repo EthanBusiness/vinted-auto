@@ -107,6 +107,7 @@ def nettoyer_fiche(d: dict) -> dict:
         "prix": lire_prix(d.get("prix")), "prix_texte": s(d.get("prix"), 40),
         "images": images, "attributs": [s(a, 200) for a in (d.get("attributs") or [])][:60],
         "tailles": tailles, "taille_choisie": s(d.get("taille_choisie"), 30),
+        "nb_photos_couleur": d.get("nb_photos_couleur") if isinstance(d.get("nb_photos_couleur"), int) else None,
         "description": s(d.get("description"), 3000),
     }
     if not fiche["titre"] or not fiche["images"]:
@@ -321,42 +322,44 @@ CADRAGE = ("CADRAGE SERRÉ, pour que l'article saute aux yeux : photo verticale 
 
 
 def images_article(fiche: dict) -> list:
-    return (fiche.get("images") or [])[:NB_IMAGES_ARTICLE]
+    """Photos de l'article à joindre dans Gemini (jamais le tableau des tailles)."""
+    imgs = fiche.get("images") or []
+    nb = fiche.get("nb_photos_couleur")
+    if isinstance(nb, int) and nb >= 2:
+        imgs = imgs[:nb]          # seulement les photos de la couleur (le tableau des tailles est après)
+    imgs = [u for u in imgs if not re.search(r"size|chart|taille|guide", u, re.I)]
+    return imgs[:NB_IMAGES_ARTICLE]
+
+
+SCENE_DEFAUT = "une femme dans un décor"
 
 
 def construire_prompts(analyse: dict, fiche: dict, compte: dict):
-    """Deux prompts Gemini (face / dos) qui reprennent la scène (décor + femme) du compte."""
-    nb = len(images_article(fiche)) or 1
-    consignes = []
-    if compte.get("scene_fichier"):
-        pieces = f"Image 1 = la SCÈNE du compte (la femme dans son décor) ; images 2 à {nb + 1} = l'ARTICLE (photos produit)"
-        consignes.append("Garde exactement la scène de l'image 1 : même décor, même lumière, même femme (même peau, même silhouette, "
-                         "mêmes cheveux, mêmes bijoux). Remplace UNIQUEMENT sa tenue par l'article.")
-        if compte.get("scene_description"):
-            consignes.append(f"Rappel de la scène : {compte['scene_description']}.")
-        debut = 2
-    else:
-        n, morceaux = 1, []
-        if compte.get("fond_fichier"):
-            morceaux.append(f"Image {n} = le DÉCOR")
-            consignes.append(f"Utilise exactement le décor de l'image {n} (même lieu, même lumière).")
-            n += 1
-        if compte.get("modele_fichier"):
-            morceaux.append(f"Image {n} = la FEMME")
-            consignes.append(f"La femme est exactement celle de l'image {n} (même peau, même silhouette, mêmes cheveux).")
-            n += 1
-        if not compte.get("fond_fichier"):
-            decor = (compte.get("scene_description") or compte.get("fond_description")
-                     or "une chambre simple et lumineuse, murs blancs, parquet clair, une plante")
-            consignes.append(f"Décor et femme : {decor}." if compte.get("scene_description") else f"Décor : {decor}.")
-        if not compte.get("modele_fichier") and not compte.get("scene_description"):
-            femme = compte.get("modele_description") or "une femme européenne d'une vingtaine d'années, naturelle, cheveux châtains"
-            consignes.append(f"La femme : {femme}.")
-        debut = n
-        morceaux.append(f"images {n} à {n + nb - 1} = l'ARTICLE (photos produit)" if nb > 1 else f"image {n} = l'ARTICLE (photo produit)")
-        pieces = " ; ".join(morceaux)
+    """Deux prompts Gemini (face / dos). Gemini mélange l'ordre des images : on désigne chaque image
+    par ce qu'on y voit, jamais par son numéro."""
     article = analyse.get("description_visuelle") or fiche.get("titre", "")
     couleur = fiche.get("couleur")
+    nom_article = f"{analyse.get('type_article') or 'article'}" + (f" {couleur}" if couleur else "")
+    consignes = []
+    if compte.get("scene_fichier"):
+        vu = compte.get("scene_description") or SCENE_DEFAUT
+        pieces = (f"- UNE photo est la SCÈNE du compte : on y voit {vu}. C'est elle qui donne la femme, le décor et la lumière.\n"
+                  f"- TOUTES LES AUTRES photos montrent l'ARTICLE à faire porter ({nom_article}).")
+        consignes.append("Garde exactement la scène : même décor, même lumière, même femme (même peau, même silhouette, mêmes "
+                         "cheveux, mêmes bijoux). Remplace UNIQUEMENT sa tenue par l'article : la tenue qu'elle porte sur la "
+                         "photo de la scène disparaît entièrement.")
+    else:
+        morceaux = []
+        if compte.get("fond_fichier"):
+            morceaux.append("- la photo d'un DÉCOR sans personne = le décor à utiliser")
+        if compte.get("modele_fichier"):
+            morceaux.append(f"- la photo d'une femme seule ({compte.get('modele_description') or 'tenue neutre'}) = la FEMME à utiliser")
+        morceaux.append(f"- toutes les autres photos = l'ARTICLE à faire porter ({nom_article})")
+        pieces = "\n".join(morceaux)
+        if not compte.get("fond_fichier"):
+            consignes.append("Décor : " + (compte.get("fond_description") or "une chambre simple et lumineuse, murs blancs, parquet clair, une plante") + ".")
+        if not compte.get("modele_fichier"):
+            consignes.append("La femme : " + (compte.get("modele_description") or "une femme européenne d'une vingtaine d'années, naturelle, cheveux châtains") + ".")
 
     def prompt(vue):
         if vue == "face":
@@ -368,16 +371,16 @@ def construire_prompts(analyse: dict, fiche: dict, compte: dict):
                     "si elle est jointe ; sinon, déduis le dos logiquement sans inventer de détail.")
         return "\n".join([
             "Crée UNE photo réaliste pour une annonce Vinted : une femme qui porte l'article.",
-            f"Images jointes : {pieces}. (Si l'ordre a changé : la scène est la photo avec la femme dans le décor, "
-            f"les autres sont les photos produit de l'article.)",
+            "Les images jointes peuvent être dans n'importe quel ordre :",
+            pieces,
+            "- S'il y a un tableau des tailles ou une image avec du texte, ignore-la.",
             *consignes,
             CADRAGE,
             pose,
             f"L'article : {article}" + (f" Couleur : {couleur}." if couleur else ""),
-            "TRÈS IMPORTANT : reproduis l'article EXACTEMENT comme sur les photos produit (images " + f"{debut}+" + ") : même couleur "
-            "(même nuance), même coupe, même longueur, même motif, même matière, mêmes détails (boutons, coutures, volants, col, "
-            "manches, ceinture). N'ajoute et ne retire rien. L'article doit être entièrement visible, ni caché par les cheveux, "
-            "ni par un sac ou une veste.",
+            "TRÈS IMPORTANT : reproduis l'article EXACTEMENT comme sur ses photos produit : même couleur (même nuance), même "
+            "coupe, même longueur, même motif, même matière, mêmes détails (boutons, coutures, volants, col, manches, ceinture). "
+            "N'ajoute et ne retire rien. L'article doit être entièrement visible, ni caché par les cheveux, ni par un sac ou une veste.",
             "Rendu : vraie photo prise à l'iPhone, lumière naturelle douce, légère imperfection naturelle, pas de rendu studio ni "
             "retouché, sans texte, sans logo, sans filigrane.",
         ])
