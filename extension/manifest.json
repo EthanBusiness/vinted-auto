@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Vinted Auto - lecteur Shein",
+  "version": "3.0.0",
+  "description": "Lit les fiches Shein dans ton navigateur (avec ton compte et tes prix) et les envoie à ton site Vinted Auto.",
+  "permissions": ["scripting", "tabs", "storage"],
+  "host_permissions": ["*://*.shein.com/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Envoyer cette fiche Shein à Vinted Auto" },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["pont.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
