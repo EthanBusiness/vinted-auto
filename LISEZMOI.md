@@ -1,6 +1,6 @@
 # Vinted Auto
 
-Tu colles un lien Shein, le site te donne : la description Vinted, les liens des photos Shein et les 2 prompts Gemini (face et dos) avec le fond et le modèle du compte choisi. Ton employée dépose les photos, puis tu publies sur tes comptes Vinted via Scalency.
+Tu colles un lien Shein (et tu choisis la taille), le site te donne : la description Vinted avec les mesures en français, le prix en ,90, les images à mettre dans Gemini (d'un coup, dans l'ordre) et les 2 prompts Gemini (face et dos) à partir de la scène du compte (fond + modèle en une seule image). Ton employée dépose les photos, puis tu publies sur tes comptes Vinted via Scalency.
 
 ## Installer (une seule fois)
 
@@ -12,12 +12,12 @@ Tu colles un lien Shein, le site te donne : la description Vinted, les liens des
    - Un raccourci **Vinted Auto** est créé sur ton Bureau : la prochaine fois, double-clique simplement dessus.
 4. Dans le site, page **Réglages** : colle tes clés (Claude, Scalency, Supabase) et clique sur **Tester** pour chacune.
 5. Installe l'extension Chrome « lecteur Shein » : le site te guide (page **Extension**, 2 minutes).
-6. Page **Comptes** : ajoute un fond et un modèle pour chaque compte (ton image, ou un prompt généré pour la créer dans Gemini).
+6. Page **Comptes** : ajoute la scène de chaque compte (la femme dans son décor, en une seule image), ou génère un prompt pour la créer dans Gemini.
 
 ## Utiliser
 
-- **Ajouter** : colle tes liens Shein (un par ligne, tu peux mettre la taille après le lien), coche les comptes, clique **Lancer**.
-- **Photos** : pour chaque article, copie le prompt dans Gemini avec les images indiquées, puis glisse les 2 photos.
+- **Ajouter** : colle tes liens Shein (un par ligne), choisis la taille de chaque article, coche les comptes, clique **Lancer**.
+- **Photos** (bouton English pour l'employée) : « Ouvrir les images » (ou ZIP), copie le prompt FACE dans Gemini (outil « Créer des images », modèle « Pro »), dépose ou colle (Ctrl+V) la photo, pareil pour le DOS. L'article passe tout seul en « Prête ».
 - **Articles** : vérifie, corrige si besoin, puis **Publier la sélection** (Scalency étale les publications).
 
 ## Mettre à jour

@@ -142,22 +142,18 @@ Le prompt doit produire UNE photo très réaliste, comme prise au smartphone (iP
 Réponds uniquement avec le prompt, sans titre ni explication, en 6 à 10 lignes."""
 
 
-def prompt_fond(idee: str):
-    demande = ("Écris un prompt pour générer un DÉCOR VIDE (aucune personne) qui servira de fond unique pour toutes les photos "
-               "d'un compte Vinted : un intérieur simple et lumineux, réaliste, avec assez de place debout au centre pour "
-               "photographier une femme en pied plus tard. Cadrage vertical, à hauteur de poitrine, mise au point nette. "
-               f"Idée de la vendeuse : {idee or 'chambre claire et cosy, murs blancs, parquet clair, une plante, un miroir'}")
-    return _appel("prompt de fond", max_tokens=1500, system=SYSTEME_PROMPTS,
-                  output_config={"effort": "low"}, messages=[{"role": "user", "content": demande}])
-
-
-def prompt_modele(idee: str):
-    demande = ("Écris un prompt pour générer la photo de référence d'UN mannequin féminin unique, qui portera ensuite tous les "
-               "vêtements d'un compte Vinted : femme européenne d'une vingtaine d'années, naturelle (pas de pose de mannequin "
-               "professionnel), debout de face, en pied, tenue simple et neutre (débardeur blanc et legging noir), fond uni "
-               "clair, visage bien visible et net, sans lunettes ni accessoire. Décris précisément visage, coiffure, couleur "
-               f"de cheveux, silhouette et taille pour qu'on la reconnaisse d'une photo à l'autre. Idée de la vendeuse : {idee or 'cheveux châtains mi-longs, silhouette fine'}")
-    return _appel("prompt de modèle", max_tokens=1500, system=SYSTEME_PROMPTS,
+def prompt_scene(idee: str):
+    """Fond + modèle générés ENSEMBLE : une seule image de référence par compte."""
+    demande = ("Écris un prompt pour générer LA PHOTO DE RÉFÉRENCE d'un compte Vinted : UNE femme dans SON décor, en une seule "
+               "image. Elle servira de base à toutes les photos du compte (on remplacera seulement sa tenue par chaque article). "
+               "Exigences : femme européenne d'une vingtaine d'années, naturelle (pas une pose de mannequin pro), debout de face, "
+               "bras détendus le long du corps ; tenue neutre et ajustée (t-shirt blanc uni et jean clair) ; cadrage vertical 3:4 "
+               "pris au smartphone à hauteur de poitrine, visage coupé juste sous le menton, du menton jusqu'aux mollets ; décor "
+               "réaliste visible autour d'elle, légèrement flou ; lumière naturelle. Décris précisément peau, silhouette, longueur "
+               "et couleur des cheveux visibles sur les épaules, bijoux éventuels, et le décor, pour qu'on les reconnaisse d'une "
+               "photo à l'autre. "
+               f"Idée de la vendeuse : {idee or 'jardin avec terrasse en bois et verdure, femme mince, cheveux châtains'}")
+    return _appel("prompt de scène", max_tokens=1500, system=SYSTEME_PROMPTS,
                   output_config={"effort": "low"}, messages=[{"role": "user", "content": demande}])
 
 

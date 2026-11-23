@@ -17,7 +17,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import atelier, config, db, ia, maj, photos, scalency
+from . import atelier, config, db, ia, maj, paquet, photos, scalency
 from .config import CODE, DONNEES, IMAGES, VERSION
 
 WEB = CODE / "web"
@@ -60,6 +60,8 @@ def json_annonce(a: dict, detail=False) -> dict:
             "fiche": {k: fiche.get(k) for k in ("titre", "couleur", "prix", "prix_texte", "images", "tailles", "attributs", "categorie", "lien")},
             "description_visuelle": analyse.get("description_visuelle", ""),
             "fond": c.get("fond_fichier", ""), "modele": c.get("modele_fichier", ""),
+            "scene": c.get("scene_fichier", ""), "scene_description": c.get("scene_description", ""),
+            "images_article": atelier.images_article(fiche),
             "modele_description": c.get("modele_description", ""), "fond_description": c.get("fond_description", ""),
             "photos_en_ligne": json.loads(a["photos_en_ligne"] or "[]"),
         })
@@ -259,7 +261,8 @@ def r_etat(h):
     compteurs = {r["statut"]: r["n"] for r in db.q("SELECT statut, COUNT(*) AS n FROM annonces GROUP BY statut")}
     h.json({
         "role": h.role(), "local": h.est_local(), "version": VERSION, "cles": cles,
-        "cout_jour_eur": round(db.cout_du_jour_usd() * eur, 4), "compteurs": compteurs,
+        "cout_jour_eur": round(db.cout_du_jour_usd() * eur, 6), "cout_mois_eur": round(db.cout_du_mois_usd() * eur, 6),
+        "compteurs": compteurs,
         "extension_dossier": str(EXTENSION_DOSSIER), "donnees": str(DONNEES),
         "publier_auto": db.reglage("publier_auto") == "1",
     })
@@ -339,6 +342,20 @@ def r_photo(h, id_, vue):
     h.json(json_annonce(_annonce(id_), detail=True))
 
 
+def r_images_zip(h, id_):
+    nom, octets = paquet.zip_de(int(id_), h.params.get("quoi", "tout"))
+    from urllib.parse import quote
+    h.envoyer(200, octets, "application/zip",
+              {"Content-Disposition": f"attachment; filename=\"images.zip\"; filename*=UTF-8''{quote(nom)}"})
+
+
+def r_images_ouvrir(h, id_):
+    if not h.est_local():
+        raise Refus("Le dossier ne peut s'ouvrir que sur le PC du site : utilise le bouton ZIP.")
+    cible = paquet.ecrire_dossier(int(id_), (h.corps_json().get("quoi") or "tout"))
+    h.json({"ok": True, "dossier": str(cible), "fichiers": sorted(f.name for f in cible.iterdir())})
+
+
 def r_valider_photos(h, id_):
     atelier.valider_photos(int(id_))
     h.json(json_annonce(_annonce(id_), detail=True))
@@ -398,7 +415,7 @@ def r_suivi(h):
 
 def r_importer(h):
     d = h.corps_json()
-    produits = atelier.importer(d.get("liens") or "", d.get("comptes") or [])
+    produits = atelier.importer(d.get("liens") or "", d.get("comptes") or [], d.get("tailles"))
     h.json({"produits": produits})
 
 
@@ -483,7 +500,7 @@ def r_compte_modifier(h, id_):
     champs = {}
     if "actif" in d:
         champs["actif"] = 1 if d["actif"] else 0
-    for k in ("fond_description", "modele_description"):
+    for k in ("fond_description", "modele_description", "scene_description"):
         if k in d:
             champs[k] = str(d[k] or "")[:1500]
     if champs:
@@ -495,7 +512,7 @@ def r_compte_modifier(h, id_):
 
 def r_compte_image(h, id_, quoi):
     c = _compte(id_)
-    if quoi not in ("fond", "modele"):
+    if quoi not in ("fond", "modele", "scene"):
         raise Refus("Image inconnue.")
     if h.params.get("supprimer"):
         db.ex(f"UPDATE comptes SET {quoi}_fichier = '' WHERE id = ?", (c["id"],))
@@ -516,10 +533,8 @@ def r_compte_image(h, id_, quoi):
 def r_compte_prompt(h, id_, quoi):
     c = _compte(id_)
     idee = str(h.corps_json().get("idee") or "")[:600]
-    if quoi == "fond":
-        texte, _ = ia.prompt_fond(idee)
-    elif quoi == "modele":
-        texte, _ = ia.prompt_modele(idee)
+    if quoi == "scene":
+        texte, _ = ia.prompt_scene(idee)
     else:
         raise Refus("Inconnu.")
     db.ex(f"UPDATE comptes SET prompt_{quoi} = ? WHERE id = ?", (texte.strip(), c["id"]))
@@ -532,6 +547,8 @@ def r_compte_copier(h, id_):
     d = h.corps_json()
     for autre in d.get("vers") or []:
         _compte(autre)
+        if "scene" in (d.get("quoi") or []):
+            db.ex("UPDATE comptes SET scene_fichier = ?, scene_description = ? WHERE id = ?", (c["scene_fichier"], c["scene_description"], autre))
         if "fond" in (d.get("quoi") or []):
             db.ex("UPDATE comptes SET fond_fichier = ?, fond_description = ? WHERE id = ?", (c["fond_fichier"], c["fond_description"], autre))
         if "modele" in (d.get("quoi") or []):
@@ -614,6 +631,8 @@ ROUTES = [
     ("POST", rf"/api/annonces/{N}", r_annonce_modifier, ADMIN),
     ("POST", rf"/api/annonces/{N}/photo/(face|dos)", r_photo, TOUS),
     ("POST", rf"/api/annonces/{N}/valider-photos", r_valider_photos, TOUS),
+    ("GET", rf"/api/annonces/{N}/images.zip", r_images_zip, TOUS),
+    ("POST", rf"/api/annonces/{N}/images/ouvrir", r_images_ouvrir, TOUS),
     ("POST", rf"/api/annonces/{N}/refaire", r_refaire, TOUS),
     ("POST", rf"/api/annonces/{N}/regenerer", r_regenerer, ADMIN),
     ("POST", rf"/api/annonces/{N}/essai", r_essai, ADMIN),
@@ -633,8 +652,8 @@ ROUTES = [
     ("GET", r"/api/comptes", r_comptes, ADMIN),
     ("POST", r"/api/comptes/synchroniser", r_comptes_sync, ADMIN),
     ("POST", r"/api/comptes/([A-Za-z0-9_-]+)", r_compte_modifier, ADMIN),
-    ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/image/(fond|modele)", r_compte_image, ADMIN),
-    ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/prompt/(fond|modele)", r_compte_prompt, ADMIN),
+    ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/image/(fond|modele|scene)", r_compte_image, ADMIN),
+    ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/prompt/(scene)", r_compte_prompt, ADMIN),
     ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/copier", r_compte_copier, ADMIN),
     ("GET", r"/api/reglages", r_reglages, ADMIN),
     ("POST", r"/api/reglages", r_reglages_enregistrer, ADMIN),

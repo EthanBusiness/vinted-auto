@@ -7,10 +7,41 @@ var ETATS = { 6: "Neuf avec étiquette", 1: "Neuf sans étiquette", 2: "Très bo
 var COLIS = { 1: "Petit", 2: "Moyen", 3: "Grand" };
 var ETAPES = { lecture: "Lecture Shein…", generation: "Rédaction…", a_photographier: "À photographier", prete: "Prête à publier", envoi: "Envoi…", en_file: "En file Scalency", publiee: "Publiée", echec: "Échec", annulee: "Annulée" };
 
+// ------------------------------------------------------------ langue (français / anglais pour l'employée)
+var LANGUE = (function () { try { return localStorage.getItem("va_langue") || "fr"; } catch (e) { return "fr"; } })();
+var EN = {
+  "📸 Photos": "📸 Photos", "Photos à faire": "Photos to do",
+  "Connexion": "Sign in", "Entre ton mot de passe Vinted Auto.": "Enter your Vinted Auto password.", "Mot de passe": "Password", "Se connecter": "Sign in",
+  "Photos Gemini": "Gemini photos", "Images à mettre dans Gemini": "Images to add in Gemini",
+  "📂 Ouvrir les images": "📂 Open the images", "⬇️ Télécharger les images (ZIP)": "⬇️ Download the images (ZIP)",
+  "Scène du compte seulement": "Account scene only", "ou en ZIP": "or as ZIP",
+  "Les photos de cet article sont déjà téléchargées (pour un autre compte) : prends seulement la scène de ce compte.": "This item's photos are already downloaded (for another account): just get this account's scene.",
+  "Dans Gemini : clique sur ＋, choisis les fichiers, sélectionne-les tous (Ctrl+A) puis Ouvrir.": "In Gemini: click ＋, choose files, select them all (Ctrl+A) then Open.",
+  "Photo de FACE": "FRONT photo", "Photo de DOS": "BACK photo", "📋 Copier le prompt": "📋 Copy the prompt", "Voir le prompt": "Show the prompt",
+  "Glisse la photo ici": "Drop the photo here", "ou clique, ou Ctrl+V": "or click, or Ctrl+V",
+  "🔁 Refaire les photos": "🔁 Redo the photos", "Terminé. Merci !": "Done. Thank you!",
+  "🎉 Aucune photo à faire pour le moment.": "🎉 No photos to do right now.",
+  "Photo enregistrée ✔": "Photo saved ✔", "Envoi…": "Uploading…", "Format refusé : JPG, PNG ou WEBP.": "Wrong format: JPG, PNG or WEBP.",
+  "copié ✔": "copied ✔", "Prompt face": "Front prompt", "Prompt dos": "Back prompt",
+  "Photos effacées : tu peux les refaire.": "Photos cleared: you can redo them.", "Préparation des images…": "Preparing the images…",
+  "Dossier ouvert : sélectionne toutes les images et glisse-les dans Gemini.": "Folder opened: select all the images and drag them into Gemini.",
+  "Ce compte n'a pas encore de scène (fond + modèle). Le prompt décrit alors une scène par défaut.": "This account has no scene yet (background + model). The prompt then describes a default scene.",
+  "Modèle Gemini : outil « Créer des images » 🍌 avec le modèle « Pro » (Nano Banana Pro).": "Gemini model: the “Create images” 🍌 tool with the “Pro” model (Nano Banana Pro).",
+  "Pour chaque article : ① prends les images, ② copie le prompt FACE dans Gemini avec les images, ③ dépose la photo obtenue, ④ pareil pour le DOS. C'est tout : l'article passe tout seul en « Prête ».": "For each item: ① get the images, ② paste the FRONT prompt in Gemini with the images, ③ drop the resulting photo, ④ same for the BACK. That's all: the item becomes “Ready” by itself.",
+  "Astuce : dans Gemini, clic droit sur la photo › Copier l'image, puis passe la souris sur la zone et fais Ctrl+V.": "Tip: in Gemini, right-click the photo › Copy image, then hover the drop zone and press Ctrl+V.",
+  "… et": "… and", "autres après celles-ci.": "more after these.", "Afficher la suite": "Show more",
+  "Le prompt est en français : Gemini le comprend très bien.": "The prompt is in French: Gemini understands it perfectly.",
+  "Image": "Image", "scène": "scene", "article": "item", "Mot de passe incorrect.": "Wrong password.",
+};
+function T(fr) { return LANGUE === "en" && EN[fr] ? EN[fr] : fr; }
+function changerLangue() { LANGUE = LANGUE === "en" ? "fr" : "en"; try { localStorage.setItem("va_langue", LANGUE); } catch (e) { /* rien */ } majBoutonLangue(); naviguer(); }
+function majBoutonLangue() { var b = $("#langue"); if (b) b.textContent = LANGUE === "en" ? "🇫🇷 Français" : "🇬🇧 English"; document.documentElement.lang = LANGUE; }
+
 // ------------------------------------------------------------ outils
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function $(sel, el) { return (el || document).querySelector(sel); }
 function $$(sel, el) { return Array.prototype.slice.call((el || document).querySelectorAll(sel)); }
+function eurosPrecis(n) { return (n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 4, maximumFractionDigits: 4 }) + " €"; }
 function euros(n) { return (Math.round((n || 0) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
 function img(nom) { return nom ? "/fichiers/" + encodeURIComponent(nom) : ""; }
 
@@ -34,7 +65,7 @@ function api(methode, chemin, corps, brut) {
 }
 
 function copier(texte, quoi) {
-  function ok() { toast((quoi || "Texte") + " copié ✔"); }
+  function ok() { toast((quoi || "Texte") + " " + T("copié ✔")); }
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(texte).then(ok, function () { copierVieux(texte); ok(); });
   copierVieux(texte); ok();
 }
@@ -54,11 +85,13 @@ function lireFichier(input, rappel) {
   input.addEventListener("change", function () { if (input.files && input.files[0]) rappel(input.files[0]); input.value = ""; });
 }
 
-// Zone « glisser-déposer » d'une photo
+// Zone « glisser-déposer » d'une photo (clic, glisser, ou Ctrl+V quand la souris est dessus)
 function zoneDepot(el, rappel) {
   var input = document.createElement("input"); input.type = "file"; input.accept = "image/jpeg,image/png,image/webp"; input.style.display = "none";
   el.appendChild(input);
+  el._rappel = rappel;
   el.addEventListener("click", function (e) { if (e.target.tagName !== "BUTTON") input.click(); });
+  el.addEventListener("mouseenter", function () { ETAT.zoneSurvol = el; });
   lireFichier(input, rappel);
   el.addEventListener("dragover", function (e) { e.preventDefault(); el.classList.add("survol"); });
   el.addEventListener("dragleave", function () { el.classList.remove("survol"); });
@@ -68,10 +101,21 @@ function zoneDepot(el, rappel) {
     if (f) rappel(f); else toast("Dépose un fichier image (télécharge d'abord l'image de Gemini).");
   });
 }
+// Ctrl+V d'une image : va dans la zone sous la souris, sinon la première zone vide de la page
+document.addEventListener("paste", function (e) {
+  var cible = document.activeElement; if (cible && ["INPUT", "TEXTAREA"].indexOf(cible.tagName) >= 0) return;
+  var items = (e.clipboardData && e.clipboardData.items) || []; var f = null;
+  for (var i = 0; i < items.length; i++) if (items[i].kind === "file" && /^image\//.test(items[i].type)) { f = items[i].getAsFile(); break; }
+  if (!f) return;
+  var z = (ETAT.zoneSurvol && document.body.contains(ETAT.zoneSurvol) && ETAT.zoneSurvol.matches(":hover")) ? ETAT.zoneSurvol : $(".depot:not(.rempli)");
+  if (!z || !z._rappel) return;
+  e.preventDefault();
+  z._rappel(new File([f], "collee." + (f.type.split("/")[1] || "png"), { type: f.type }));
+});
 
 // ------------------------------------------------------------ navigation
 function routes() {
-  if (ETAT.role === "employee") return [["photos", "📸 Photos"]];
+  if (ETAT.role === "employee") return [["photos", T("📸 Photos")]];
   return [["articles", "📋 Articles"], ["ajouter", "➕ Ajouter"], ["photos", "📸 Photos"], ["comptes", "👗 Comptes"], ["reglages", "⚙️ Réglages"]];
 }
 
@@ -101,7 +145,7 @@ function naviguer() {
 function rafraichirEtat() {
   return api("GET", "/api/etat").then(function (e) {
     ETAT.role = e.role; ETAT.etat = e;
-    $("#cout").textContent = e.role === "admin" ? "Coût IA aujourd'hui : " + euros(e.cout_jour_eur) : "";
+    $("#cout").textContent = e.role === "admin" ? "Crédits IA : " + eurosPrecis(e.cout_jour_eur) + " aujourd'hui · " + eurosPrecis(e.cout_mois_eur) + " ce mois" : "";
     var b = "";
     if (e.role === "admin") {
       var manque = [];
@@ -125,13 +169,13 @@ function relancerLectures() {
 // ------------------------------------------------------------ connexion (accès à distance)
 function afficherConnexion() {
   $("#menu").innerHTML = ""; $("#bandeau").innerHTML = ""; $("#cout").textContent = "";
-  $("#page").innerHTML = '<div class="carte connexion"><h1>Connexion</h1><p class="aide">Entre ton mot de passe Vinted Auto.</p>' +
-    '<form id="f"><label>Mot de passe</label><input type="password" id="mdp" autofocus><p id="e" class="erreur"></p>' +
-    '<button class="principal gros" type="submit">Se connecter</button></form></div>';
+  $("#page").innerHTML = '<div class="carte connexion"><h1>' + T("Connexion") + '</h1><p class="aide">' + T("Entre ton mot de passe Vinted Auto.") + '</p>' +
+    '<form id="f"><label>' + T("Mot de passe") + '</label><input type="password" id="mdp" autofocus><p id="e" class="erreur"></p>' +
+    '<button class="principal gros" type="submit">' + T("Se connecter") + '</button></form></div>';
   $("#f").addEventListener("submit", function (ev) {
     ev.preventDefault();
     api("POST", "/api/connexion", { mot_de_passe: $("#mdp").value }).then(function () { return demarrer(); })
-      .catch(function (e) { $("#e").textContent = e.message; });
+      .catch(function (e) { $("#e").textContent = T(e.message); });
   });
 }
 
@@ -193,32 +237,58 @@ function casesComptes(comptes) {
   var dispo = comptes.filter(function (c) { return c.relie && c.actif; });
   if (!dispo.length) return '<p class="erreur">Aucun compte Vinted relié trouvé. Remplis ta clé Scalency dans <a href="#reglages">Réglages</a>, puis clique sur « Mettre à jour la liste » dans <a href="#comptes">Comptes</a>.</p>';
   return '<div class="cases">' + dispo.map(function (c) {
-    var avert = (!c.fond_fichier || !c.modele_fichier) ? ' <span title="Pas encore de fond ou de modèle pour ce compte">⚠️</span>' : "";
+    var avert = !c.scene_fichier ? ' <span title="Pas encore de scène (fond + modèle) pour ce compte">⚠️</span>' : "";
     return '<label><input type="checkbox" class="cc" value="' + esc(c.id) + '"> ' + esc(c.login) + avert + "</label>";
-  }).join("") + '</div><p class="aide">⚠️ = ce compte n\'a pas encore de fond ou de modèle (<a href="#comptes">les ajouter</a>).</p>';
+  }).join("") + '</div><p class="aide">⚠️ = ce compte n\'a pas encore de scène (fond + modèle) : <a href="#comptes">l\'ajouter</a>.</p>';
 }
 function brancherCases() {
   $$(".cc").forEach(function (c) { c.onchange = function () { c.parentNode.classList.toggle("coche", c.checked); }; });
 }
 function comptesCoches() { return $$(".cc").filter(function (c) { return c.checked; }).map(function (c) { return c.value; }); }
 
+var TAILLES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Taille unique"];
+function optionsTailles(choisie) {
+  return '<option value="">— plus tard —</option>' + TAILLES.map(function (t) { return "<option" + (t === choisie ? " selected" : "") + ">" + t + "</option>"; }).join("");
+}
 function pageAjouter(h) {
   if (h.q.brouillon) return pageBrouillon(h.q.brouillon);
   var ext = extensionPresente();
   $("#page").innerHTML = '<h1>Ajouter des articles Shein</h1>' +
     (h.q.erreur ? '<div class="carte erreur">' + esc(h.q.erreur) + "</div>" : "") +
     '<div class="carte"><label>1. Colle tes liens Shein (un par ligne)</label>' +
-    '<textarea id="liens" rows="7" placeholder="https://fr.shein.com/....-p-12345678.html\nhttps://fr.shein.com/....-p-87654321.html M"></textarea>' +
-    '<p class="aide">Astuce : ajoute la taille après le lien (ex : <code>…html M</code>) si tu la connais. Sinon tu la choisiras après.</p>' +
-    '<label>2. Sur quel(s) compte(s) Vinted ?</label><div id="comptes">Chargement…</div>' +
+    '<textarea id="liens" rows="6" placeholder="https://fr.shein.com/....-p-12345678.html\nhttps://fr.shein.com/....-p-87654321.html"></textarea>' +
+    '<label>2. La taille de chaque article</label><div id="tailles"><p class="aide">Colle d\'abord tes liens : une ligne par article apparaît ici.</p></div>' +
+    '<p class="aide">Les mesures de cette taille (fiche Shein) sont ajoutées en français dans la description.</p>' +
+    '<label>3. Sur quel(s) compte(s) Vinted ?</label><div id="comptes">Chargement…</div>' +
     '<div class="ligne" style="margin-top:16px"><button class="principal gros" id="go">✨ Lancer</button>' +
     (ext ? '<span class="aide ok">Extension « lecteur Shein » : OK ✔</span>' : '<span class="erreur">L\'extension n\'est pas installée : <a href="#extension">l\'installer</a> (sinon la lecture Shein ne peut pas marcher).</span>') +
     '</div><p id="res"></p></div>' +
     '<div class="carte"><h2>Autre façon, depuis Shein</h2><p class="aide">Quand tu es sur une fiche Shein, clique sur l\'icône de l\'extension Vinted Auto (en haut à droite de Chrome) : la fiche arrive ici avec ton prix et la taille que tu as choisie.</p></div>';
   chargerComptes().then(function (cs) { $("#comptes").innerHTML = casesComptes(cs); brancherCases(); });
+  var choix = {};   // lien -> taille choisie
+  function liens() {
+    return $("#liens").value.split("\n").map(function (l) {
+      var m = /https?:\/\/\S+/.exec(l); if (!m) return null;
+      var reste = l.replace(m[0], "").trim().toUpperCase(); return { lien: m[0], taille: reste };
+    }).filter(Boolean);
+  }
+  function majTailles() {
+    var ls = liens();
+    if (!ls.length) { $("#tailles").innerHTML = '<p class="aide">Colle d\'abord tes liens : une ligne par article apparaît ici.</p>'; return; }
+    $("#tailles").innerHTML = (ls.length > 1 ? '<div class="ligne" style="margin-bottom:6px"><span class="aide">La même taille pour tous :</span><select id="tous" style="width:auto">' + optionsTailles("") + "</select></div>" : "") +
+      '<div class="liste">' + ls.map(function (l, i) {
+        var id = (/-p-(\d+)/.exec(l.lien) || [])[1] || l.lien.slice(-30);
+        var t = choix[l.lien] != null ? choix[l.lien] : (TAILLES.indexOf(l.taille) >= 0 ? l.taille : "");
+        return '<div class="ligne lt"><span class="badge">' + (i + 1) + '</span><span class="etire aide" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">Article ' + esc(id) + '</span><select class="st" data-lien="' + esc(l.lien) + '" style="width:auto">' + optionsTailles(t) + "</select></div>";
+      }).join("") + "</div>";
+    $$(".st").forEach(function (sel) { sel.onchange = function () { choix[sel.dataset.lien] = sel.value; }; });
+    if ($("#tous")) $("#tous").onchange = function () { var v = this.value; $$(".st").forEach(function (sel) { sel.value = v; choix[sel.dataset.lien] = v; }); };
+  }
+  $("#liens").addEventListener("input", majTailles);
   $("#go").onclick = function () {
     var b = this; b.disabled = true;
-    api("POST", "/api/importer", { liens: $("#liens").value, comptes: comptesCoches() }).then(function (r) {
+    var tailles = $$(".st").map(function (sel) { return sel.value; });
+    api("POST", "/api/importer", { liens: $("#liens").value, comptes: comptesCoches(), tailles: tailles }).then(function (r) {
       envoyerAExtension(r.produits);
       toast(r.produits.length + " article(s) en préparation : Chrome ouvre les fiches Shein en arrière-plan.", 6000);
       FILTRES.statut = ""; location.hash = "#articles";
@@ -262,7 +332,7 @@ function pageArticle(h) {
     var tailles = (f.tailles || []).map(function (t) { return t.taille; });
     var liensPhotos = (f.images || []).join("\n");
     var html = '<div class="ligne"><h1 class="etire">' + esc(a.titre) + "</h1>" + badge(a.statut) + "</div>" +
-      '<p class="aide">Compte : <b>' + esc(a.compte) + "</b>" + (a.lien ? ' · <a href="' + esc(a.lien) + '" target="_blank" rel="noopener">Fiche Shein</a>' : "") + (f.prix ? " · prix Shein : " + esc(f.prix_texte || euros(f.prix)) : "") + (a.cout_eur ? " · coût IA : " + euros(a.cout_eur) : "") + "</p>" +
+      '<p class="aide">Compte : <b>' + esc(a.compte) + "</b>" + (a.lien ? ' · <a href="' + esc(a.lien) + '" target="_blank" rel="noopener">Fiche Shein</a>' : "") + (f.prix ? " · prix Shein : " + esc(f.prix_texte || euros(f.prix)) : "") + (a.cout_eur ? " · coût IA : " + eurosPrecis(a.cout_eur) : "") + "</p>" +
       (a.erreur ? '<div class="carte erreur">' + esc(a.erreur) + (a.statut === "echec" && a.lecture_erreur ? ' <button id="relire">🔄 Relire la fiche Shein</button>' : "") + "</div>" : "") +
       (a.job_info && (a.statut === "en_file" || a.statut === "publiee") ? '<div class="carte">Scalency : ' + esc(a.job_info) + (a.vinted_id ? " · annonce Vinted n°" + esc(a.vinted_id) : "") + "</div>" : "") +
       (enCours ? '<div class="carte">⏳ ' + esc(ETAPES[a.statut]) + ' Cette page se met à jour toute seule.' + (a.statut === "lecture" && !extensionPresente() ? ' <span class="erreur">L\'extension n\'est pas installée : <a href="#extension">l\'installer</a>.</span>' : "") + "</div>" : "");
@@ -271,7 +341,7 @@ function pageArticle(h) {
         '<div class="carte"><div class="ligne"><h2 class="etire">Description Vinted</h2><button id="copierTout">📋 Copier titre + description</button></div>' +
         '<label>Titre</label><input id="titre" maxlength="100" value="' + esc(a.titre) + '"' + (envoyee ? " disabled" : "") + ">" +
         '<label>Description</label><textarea id="description" rows="9"' + (envoyee ? " disabled" : "") + ">" + esc(a.description) + "</textarea>" +
-        '<div class="grille2"><div><label>Prix (€)</label><input id="prix" type="number" step="0.5" min="1" value="' + esc(a.prix) + '"' + (envoyee ? " disabled" : "") + "></div>" +
+        '<div class="grille2"><div><label>Prix (€)</label><input id="prix" type="number" step="0.01" min="1" value="' + esc(a.prix) + '"' + (envoyee ? " disabled" : "") + "></div>" +
         "<div><label>Taille</label><select id=\"taille\"" + (envoyee ? " disabled" : "") + "><option value=\"\">— à choisir —</option>" + tailles.map(function (t) { return "<option" + (t === a.taille ? " selected" : "") + ">" + esc(t) + "</option>"; }).join("") + "</select>" + (a.taille && !a.size_id ? '<p class="erreur">Taille non trouvée dans cette catégorie Vinted : change la catégorie.</p>' : "") + "</div></div>" +
         '<label>Catégorie Vinted</label><input id="cat" value="' + esc(a.catalogue || "") + '" placeholder="Tape pour chercher (ex : robe)"' + (envoyee ? " disabled" : "") + '><div id="catres"></div>' +
         '<label>Couleurs (2 max)</label><div class="cases" id="couleurs">' + Object.keys(COULEURS).map(function (k) { var c = a.color_ids.indexOf(Number(k)) >= 0; return '<label class="' + (c ? "coche" : "") + '"><input type="checkbox" value="' + k + '"' + (c ? " checked" : "") + (envoyee ? " disabled" : "") + "> " + COULEURS[k] + "</label>"; }).join("") + "</div>" +
@@ -362,55 +432,83 @@ function brancherActions(a, recharger) {
   };
 }
 
-// Bloc « photos Gemini » : prompts + dépôt (utilisé par la page article et la page photos)
+// Bloc « photos Gemini » : images + prompts + dépôt (utilisé par la page article et la page photos)
+function dejaTelecharge(produitId) { try { return !!localStorage.getItem("va_tel_" + produitId); } catch (e) { return false; } }
+function noterTelecharge(produitId) { try { localStorage.setItem("va_tel_" + produitId, "1"); } catch (e) { /* rien */ } }
+
 function blocPhotos(a) {
-  var f = a.fiche || {};
   var envoyee = ["envoi", "en_file", "publiee"].indexOf(a.statut) >= 0;
-  var n = 1, pieces = "";
-  if (a.fond) { pieces += '<figure><img src="' + img(a.fond) + '"><a href="' + img(a.fond) + '" download="fond.' + a.fond.split(".").pop() + '">Image ' + n + " : fond</a></figure>"; n++; }
-  if (a.modele) { pieces += '<figure><img src="' + img(a.modele) + '"><a href="' + img(a.modele) + '" download="modele.' + a.modele.split(".").pop() + '">Image ' + n + " : modèle</a></figure>"; n++; }
-  (f.images || []).slice(0, 4).forEach(function (u, i) { pieces += '<figure><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" referrerpolicy="no-referrer"></a>Image ' + (n + i) + " : article</figure>"; });
+  var local = ETAT.etat && ETAT.etat.local;
+  var n = 1, vignettes = "";
+  if (a.scene) { vignettes += '<figure><img src="' + img(a.scene) + '">' + T("Image") + " " + n + " : " + T("scène") + "</figure>"; n++; }
+  else {
+    if (a.fond) { vignettes += '<figure><img src="' + img(a.fond) + '">' + T("Image") + " " + n + " : fond</figure>"; n++; }
+    if (a.modele) { vignettes += '<figure><img src="' + img(a.modele) + '">' + T("Image") + " " + n + " : modèle</figure>"; n++; }
+  }
+  (a.images_article || []).forEach(function (u, i) { vignettes += '<figure><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" referrerpolicy="no-referrer"></a>' + T("Image") + " " + (n + i) + " : " + T("article") + "</figure>"; });
+  var deja = dejaTelecharge(a.produit_id) && (a.scene || a.fond || a.modele);
+  var zip = "/api/annonces/" + a.id + "/images.zip";
+  var boutons = local
+    ? '<button class="' + (deja ? "" : "principal ") + 'img-ouvrir" data-quoi="tout">' + T("📂 Ouvrir les images") + " (" + (n - 1 + (a.images_article || []).length) + ")</button>" +
+      ((a.scene || a.fond || a.modele) ? '<button class="' + (deja ? "principal " : "") + 'img-ouvrir" data-quoi="scene">' + T("Scène du compte seulement") + "</button>" : "") +
+      ' <a class="aide img-zip" href="' + zip + '?quoi=tout" download>' + T("ou en ZIP") + "</a>"
+    : '<a class="bouton ' + (deja ? "" : "principal ") + 'img-zip" href="' + zip + '?quoi=tout" download>' + T("⬇️ Télécharger les images (ZIP)") + "</a>" +
+      ((a.scene || a.fond || a.modele) ? '<a class="bouton ' + (deja ? "principal " : "") + 'img-zip" data-quoi="scene" href="' + zip + '?quoi=scene" download>' + T("Scène du compte seulement") + "</a>" : "");
   function depot(vue, titre) {
     var p = a["photo_" + vue];
-    return '<div class="depot ' + (p ? "rempli" : "") + '" data-vue="' + vue + '">' + (p ? '<img src="' + img(p) + '">' : "<b>" + titre + "</b><span>Glisse la photo ici<br>ou clique pour la choisir</span>") + "</div>";
+    return '<div class="depot ' + (p ? "rempli" : "") + '" data-vue="' + vue + '">' + (p ? '<img src="' + img(p) + '">' : "<b>" + T(titre) + "</b><span>" + T("Glisse la photo ici") + "<br>" + T("ou clique, ou Ctrl+V") + "</span>") + "</div>";
   }
-  return '<div class="carte"><h2>Photos Gemini</h2>' +
-    (!a.fond || !a.modele ? '<p class="erreur">Ce compte n\'a pas encore ' + (!a.fond ? "de fond" : "") + (!a.fond && !a.modele ? " ni " : "") + (!a.modele ? "de modèle" : "") + (ETAT.role === "admin" ? ' : <a href="#comptes">l\'ajouter</a>' : "") + ". Le prompt décrit alors un décor et une femme par défaut.</p>" : "") +
-    '<p class="aide">Dans Gemini : joins ces images dans cet ordre, puis colle le prompt.</p><div class="images-compte">' + pieces + "</div>" +
-    '<div class="grille2" style="margin-top:12px"><div><div class="ligne"><h3 class="etire">1. Photo de face</h3><button class="cp" data-v="face">📋 Copier le prompt</button></div>' +
-    '<details><summary class="aide">Voir le prompt</summary><div class="prompt">' + esc(a.prompt_face) + "</div></details>" + (envoyee ? (a.photo_face ? '<img style="width:100%;border-radius:8px" src="' + img(a.photo_face) + '">' : "") : depot("face", "Photo de FACE")) + "</div>" +
-    '<div><div class="ligne"><h3 class="etire">2. Photo de dos</h3><button class="cp" data-v="dos">📋 Copier le prompt</button></div>' +
-    '<details><summary class="aide">Voir le prompt</summary><div class="prompt">' + esc(a.prompt_dos) + "</div></details>" + (envoyee ? (a.photo_dos ? '<img style="width:100%;border-radius:8px" src="' + img(a.photo_dos) + '">' : "") : depot("dos", "Photo de DOS")) + "</div></div>" +
-    (envoyee ? "" : '<div class="ligne" style="margin-top:12px">' + (a.photo_face && a.photo_dos && a.statut === "a_photographier" ? '<button class="principal" data-act="valider">✅ Les photos sont bonnes</button>' : "") +
-      ((a.photo_face || a.photo_dos) ? '<button data-act="refaire">🔁 Refaire les photos</button>' : "") + "</div>") +
+  function etape(num, vue, titre) {
+    return '<div><div class="ligne"><h3 class="etire">' + num + " " + T(titre) + '</h3><button class="cp principal" data-v="' + vue + '">' + T("📋 Copier le prompt") + "</button></div>" +
+      '<details><summary class="aide">' + T("Voir le prompt") + "</summary>" + (LANGUE === "en" ? '<p class="aide">' + T("Le prompt est en français : Gemini le comprend très bien.") + "</p>" : "") + '<div class="prompt">' + esc(a["prompt_" + vue]) + "</div></details>" +
+      (envoyee ? (a["photo_" + vue] ? '<img style="width:100%;border-radius:8px" src="' + img(a["photo_" + vue]) + '">' : "") : depot(vue, titre)) + "</div>";
+  }
+  return '<div class="carte"><h2>' + T("Photos Gemini") + "</h2>" +
+    (!a.scene && !a.fond && !a.modele ? '<p class="erreur">' + T("Ce compte n'a pas encore de scène (fond + modèle). Le prompt décrit alors une scène par défaut.") + (ETAT.role === "admin" ? ' <a href="#comptes">→ Comptes</a>' : "") + "</p>" : "") +
+    '<h3>① ' + T("Images à mettre dans Gemini") + '</h3><div class="images-compte">' + vignettes + "</div>" +
+    (envoyee ? "" : '<div class="ligne" style="margin-top:8px">' + boutons + "</div>" +
+      (deja ? '<p class="aide ok">' + T("Les photos de cet article sont déjà téléchargées (pour un autre compte) : prends seulement la scène de ce compte.") + "</p>" : "") +
+      '<p class="aide">' + T("Dans Gemini : clique sur ＋, choisis les fichiers, sélectionne-les tous (Ctrl+A) puis Ouvrir.") + " " + T("Modèle Gemini : outil « Créer des images » 🍌 avec le modèle « Pro » (Nano Banana Pro).") + "</p>") +
+    '<div class="grille2" style="margin-top:6px">' + etape("②", "face", "Photo de FACE") + etape("③", "dos", "Photo de DOS") + "</div>" +
+    (envoyee ? "" : '<p class="aide">' + T("Astuce : dans Gemini, clic droit sur la photo › Copier l'image, puis passe la souris sur la zone et fais Ctrl+V.") + "</p>" +
+      ((a.photo_face || a.photo_dos) ? '<div class="ligne"><button data-act="refaire">' + T("🔁 Refaire les photos") + "</button></div>" : "")) +
     "</div>";
 }
 
 function brancherPhotos(a, recharger, racine) {
   var r = racine || document;
-  $$(".cp", r).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); copier(b.dataset.v === "face" ? a.prompt_face : a.prompt_dos, "Prompt " + b.dataset.v); }; });
+  $$(".cp", r).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); copier(b.dataset.v === "face" ? a.prompt_face : a.prompt_dos, T(b.dataset.v === "face" ? "Prompt face" : "Prompt dos")); }; });
+  $$(".img-ouvrir", r).forEach(function (b) {
+    b.onclick = function () {
+      b.disabled = true; toast(T("Préparation des images…"));
+      api("POST", "/api/annonces/" + a.id + "/images/ouvrir", { quoi: b.dataset.quoi }).then(function () {
+        if (b.dataset.quoi === "tout") noterTelecharge(a.produit_id);
+        toast(T("Dossier ouvert : sélectionne toutes les images et glisse-les dans Gemini."), 6000); b.disabled = false;
+      }).catch(function (e) { toast(e.message, 8000); b.disabled = false; });
+    };
+  });
+  $$(".img-zip", r).forEach(function (l) { l.addEventListener("click", function () { if (l.dataset.quoi !== "scene") noterTelecharge(a.produit_id); }); });
   $$(".depot", r).forEach(function (z) {
     zoneDepot(z, function (fichier) {
-      if (!/^image\/(jpeg|png|webp)$/.test(fichier.type)) return toast("Format refusé : JPG, PNG ou WEBP.");
-      z.innerHTML = "Envoi…";
-      api("POST", "/api/annonces/" + a.id + "/photo/" + z.dataset.vue, undefined, fichier).then(function () { toast("Photo enregistrée ✔"); recharger(); }).catch(function (e) { toast(e.message, 6000); recharger(); });
+      if (!/^image\/(jpeg|png|webp)$/.test(fichier.type)) return toast(T("Format refusé : JPG, PNG ou WEBP."));
+      z.innerHTML = T("Envoi…");
+      api("POST", "/api/annonces/" + a.id + "/photo/" + z.dataset.vue, undefined, fichier).then(function () { toast(T("Photo enregistrée ✔")); recharger(); }).catch(function (e) { toast(e.message, 6000); recharger(); });
     });
   });
   $$("[data-act]", r).forEach(function (b) {
     b.onclick = function () {
-      var act = b.dataset.act;
-      api("POST", "/api/annonces/" + a.id + (act === "valider" ? "/valider-photos" : "/refaire")).then(function () { toast(act === "valider" ? "Validé ✔" : "Photos effacées : tu peux les refaire."); recharger(); }).catch(function (e) { toast(e.message, 6000); });
+      api("POST", "/api/annonces/" + a.id + "/refaire").then(function () { toast(T("Photos effacées : tu peux les refaire.")); recharger(); }).catch(function (e) { toast(e.message, 6000); });
     };
   });
 }
 
 // ------------------------------------------------------------ page : photos (employée)
 function pagePhotos() {
-  $("#page").innerHTML = '<h1>Photos à faire</h1><p class="aide">Pour chaque article : 1) ouvre Gemini, joins les images dans l\'ordre indiqué, colle le prompt « face » ; 2) télécharge la photo et glisse-la dans « Photo de FACE » ; 3) pareil pour le dos ; 4) vérifie que la couleur, la coupe et les détails sont identiques à l\'article, puis clique « Les photos sont bonnes ».</p><div id="pl"><p class="vide">Chargement…</p></div>';
+  $("#page").innerHTML = '<h1>' + T("Photos à faire") + '</h1><p class="aide">' + T("Pour chaque article : ① prends les images, ② copie le prompt FACE dans Gemini avec les images, ③ dépose la photo obtenue, ④ pareil pour le DOS. C'est tout : l'article passe tout seul en « Prête ».") + '</p><div id="pl"><p class="vide">…</p></div>';
   function bloc(a) {
     var fini = a.statut !== "a_photographier";
     return '<div class="bloc" id="b' + a.id + '"><h2>' + (fini ? "✅ " : "") + esc(a.titre) + ' <span class="aide">· ' + esc(a.compte) + "</span></h2>" +
-      (fini ? '<p class="aide ok">Terminé. Merci !</p>' : blocPhotos(a)) + "</div>";
+      (fini ? '<p class="aide ok">' + T("Terminé. Merci !") + "</p>" : blocPhotos(a)) + "</div>";
   }
   function brancher(a) {
     var el = $("#b" + a.id); if (!el) return;
@@ -424,12 +522,12 @@ function pagePhotos() {
   function charger() {
     api("GET", "/api/annonces?statut=a_photographier").then(function (r) {
       var pl = $("#pl"); if (!pl) return;
-      if (!r.annonces.length) { pl.innerHTML = '<p class="vide">🎉 Aucune photo à faire pour le moment.</p>'; return; }
+      if (!r.annonces.length) { pl.innerHTML = '<p class="vide">' + T("🎉 Aucune photo à faire pour le moment.") + "</p>"; return; }
       var ids = r.annonces.slice(0, 15).map(function (a) { return a.id; });
       Promise.all(ids.map(function (i) { return api("GET", "/api/annonces/" + i); })).then(function (liste) {
         var pl2 = $("#pl"); if (!pl2) return;
         pl2.innerHTML = liste.map(bloc).join("") +
-          (r.annonces.length > 15 ? '<p class="aide">… et ' + (r.annonces.length - 15) + ' autres après celles-ci. <button id="suite">Afficher la suite</button></p>' : "");
+          (r.annonces.length > 15 ? '<p class="aide">' + T("… et") + " " + (r.annonces.length - 15) + " " + T("autres après celles-ci.") + ' <button id="suite">' + T("Afficher la suite") + "</button></p>" : "");
         liste.forEach(brancher);
         if ($("#suite")) $("#suite").onclick = charger;
       });
@@ -441,7 +539,7 @@ function pagePhotos() {
 // ------------------------------------------------------------ page : comptes (fond + modèle)
 function pageComptes() {
   $("#page").innerHTML = '<div class="ligne"><h1 class="etire">Comptes Vinted</h1><button id="sync">🔄 Mettre à jour la liste depuis Scalency</button></div>' +
-    '<p class="aide">Chaque compte a <b>un seul fond</b> et <b>un seul modèle</b> (la même femme sur toutes les photos du compte). Les prompts des photos les reprennent automatiquement.</p><div id="lc"><p class="vide">Chargement…</p></div>';
+    '<p class="aide">Chaque compte a <b>une seule scène</b> : la même femme dans le même décor, en <b>une seule image</b> (fond + modèle ensemble). Toutes les photos du compte partent de cette scène : Gemini remplace seulement la tenue par l\'article.</p><div id="lc"><p class="vide">Chargement…</p></div>';
   $("#sync").onclick = function () {
     this.disabled = true;
     api("POST", "/api/comptes/synchroniser").then(function (r) { toast(r.nombre + " comptes lus dans Scalency."); pageComptes(); }).catch(function (e) { toast(e.message, 6000); $("#sync").disabled = false; });
@@ -456,23 +554,22 @@ function pageComptes() {
 }
 
 function carteCompte(c) {
-  function bloc(quoi, titre, desc, idee) {
-    var fichier = c[quoi + "_fichier"];
-    return '<div><h3>' + titre + "</h3>" +
-      '<div class="depot ' + (fichier ? "rempli" : "") + '" data-quoi="' + quoi + '">' + (fichier ? '<img src="' + img(fichier) + '">' : "<b>Glisse ici l'image du " + (quoi === "fond" ? "fond" : "modèle") + "</b><span>ou clique pour la choisir</span>") + "</div>" +
-      (fichier ? '<button class="danger petit" data-suppr="' + quoi + '">Retirer l\'image</button>' : "") +
-      "<label>Description courte du " + (quoi === "fond" ? "décor" : "modèle") + " (facultatif)</label>" +
-      '<textarea rows="2" data-desc="' + quoi + '_description" placeholder="' + desc + '">' + esc(c[quoi + "_description"]) + "</textarea>" +
-      "<details><summary class=\"aide\">✨ Je n'ai pas d'image : générer un prompt pour la créer dans Gemini</summary>" +
-      '<input data-idee="' + quoi + '" placeholder="' + idee + '"><button data-gen="' + quoi + '" style="margin-top:6px">Générer le prompt</button>' +
-      (c["prompt_" + quoi] ? '<div class="prompt" style="margin-top:6px">' + esc(c["prompt_" + quoi]) + '</div><button data-cpp="' + quoi + '">📋 Copier ce prompt</button>' : "") +
-      "<p class=\"aide\">Colle ce prompt dans Gemini, télécharge l'image, puis glisse-la dans la zone au-dessus.</p></details></div>";
-  }
+  var f = c.scene_fichier;
+  var ancien = !f && (c.fond_fichier || c.modele_fichier);
   return '<div class="carte" id="c-' + esc(c.id) + '"><div class="ligne"><h2 class="etire">' + esc(c.login) + "</h2>" +
     '<label style="margin:0;font-weight:500"><input type="checkbox" data-actif ' + (c.actif ? "checked" : "") + ' style="width:auto"> utiliser ce compte</label></div>' +
-    '<div class="grille2">' + bloc("fond", "🖼️ Fond (décor)", "ex : chambre blanche, parquet clair, plante verte", "Ton idée de décor (ex : salon beige cosy avec miroir)") +
-    bloc("modele", "👩 Modèle (femme)", "ex : 23 ans, cheveux châtains mi-longs, silhouette fine", "Ton idée de modèle (ex : blonde, cheveux longs ondulés)") + "</div>" +
-    '<div class="ligne" style="margin-top:10px"><button class="principal" data-save>💾 Enregistrer les descriptions</button></div></div>';
+    '<div class="grille2"><div><h3>🖼️👩 Scène du compte (fond + modèle)</h3>' +
+    '<div class="depot ' + (f ? "rempli" : "") + '" data-quoi="scene">' + (f ? '<img src="' + img(f) + '">' : "<b>Glisse ici l'image de la scène</b><span>(la femme dans son décor) ou clique pour la choisir</span>") + "</div>" +
+    (f ? '<button class="danger petit" data-suppr="scene">Retirer l\'image</button>' : "") +
+    (ancien ? '<p class="aide">Ce compte utilise encore l\'ancien fond / modèle séparés, en attendant une scène.</p>' : "") +
+    "</div><div><h3>✨ Pas encore d'image ? Génère-la dans Gemini</h3>" +
+    '<label>Ton idée (décor + femme, en quelques mots)</label><input data-idee="scene" placeholder="ex : jardin avec terrasse en bois, femme mince, cheveux châtains, bracelets">' +
+    '<button data-gen="scene" style="margin-top:6px">Générer le prompt</button>' +
+    (c.prompt_scene ? '<div class="prompt" style="margin-top:6px">' + esc(c.prompt_scene) + '</div><button data-cpp="scene" class="principal">📋 Copier ce prompt</button>' : "") +
+    "<p class=\"aide\">Colle ce prompt dans Gemini (outil « Créer des images », modèle « Pro »), télécharge l'image, puis glisse-la dans la zone à gauche.</p>" +
+    "<label>Description courte de la scène (facultatif)</label>" +
+    '<textarea rows="2" data-desc="scene_description" placeholder="ex : terrasse en bois, haie verte ; femme fine, peau claire, cheveux châtains, bracelets fins">' + esc(c.scene_description) + "</textarea>" +
+    '<button data-save>💾 Enregistrer la description</button></div></div></div>';
 }
 
 function brancherCompte(c) {
@@ -490,7 +587,7 @@ function brancherCompte(c) {
   $$("[data-gen]", el).forEach(function (b) {
     b.onclick = function () {
       b.disabled = true; b.textContent = "Génération…";
-      api("POST", url + "/prompt/" + b.dataset.gen, { idee: $('[data-idee="' + b.dataset.gen + '"]', el).value }).then(function () { maj(); setTimeout(function () { var d = $$("#c-" + CSS.escape(c.id) + " details"); d.forEach(function (x) { if ($("[data-gen='" + b.dataset.gen + "']", x)) x.open = true; }); }, 300); })
+      api("POST", url + "/prompt/" + b.dataset.gen, { idee: $('[data-idee="' + b.dataset.gen + '"]', el).value }).then(maj)
         .catch(function (e) { toast(e.message, 6000); b.disabled = false; b.textContent = "Générer le prompt"; });
     };
   });
@@ -523,7 +620,7 @@ function pageReglages() {
       '<div><label>Prix Vinted = prix Shein ×</label><input data-r="prix_coef" value="' + esc(g.prix_coef) + '"></div>' +
       '<div><label>+ (en €)</label><input data-r="prix_ajout" value="' + esc(g.prix_ajout) + '"></div>' +
       '<div><label>Prix minimum (€)</label><input data-r="prix_min" value="' + esc(g.prix_min) + '"></div></div>' +
-      '<p class="aide">Exemple : un article à 10 € sur Shein sera mis à ' + esc(Math.max(Number(g.prix_min), Math.ceil(10 * Number(g.prix_coef) + Number(g.prix_ajout)))) + " € (arrondi à l'euro au-dessus). Tu peux toujours changer le prix d'une annonce.</p>" +
+      '<p class="aide">Le prix est ensuite arrondi en ,90 « psychologique » à 2 € près : 39,90 plutôt que 40,90. Tu peux toujours changer le prix d\'une annonce.</p>' +
       '<div class="grille3"><div><label>État par défaut</label><select data-r="etat_id">' + Object.keys(ETATS).map(function (k) { return '<option value="' + k + '"' + (k === String(g.etat_id) ? " selected" : "") + ">" + ETATS[k] + "</option>"; }).join("") + "</select></div>" +
       '<div><label>Taille de colis par défaut</label><select data-r="colis_id">' + Object.keys(COLIS).map(function (k) { return '<option value="' + k + '"' + (k === String(g.colis_id) ? " selected" : "") + ">" + COLIS[k] + "</option>"; }).join("") + "</select></div>" +
       '<div><label>Minutes entre 2 publications d\'un même compte</label><input data-r="espacement_min" value="' + esc(g.espacement_min) + '"></div></div>' +
@@ -593,6 +690,7 @@ function demarrer() {
   }).catch(function (e) { if (ETAT.role === null && /Connecte/.test(e.message)) return; $("#page").innerHTML = '<p class="erreur">' + esc(e.message) + "</p>"; });
 }
 window.addEventListener("hashchange", naviguer);
+(function () { var b = document.createElement("button"); b.id = "langue"; b.className = "langue"; b.onclick = changerLangue; $(".barre").appendChild(b); majBoutonLangue(); })();
 // l'extension s'annonce juste après le chargement : on attend un instant
 setTimeout(demarrer, 150);
 setInterval(relancerLectures, 30000);
