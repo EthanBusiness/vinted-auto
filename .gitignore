@@ -1,8 +1,8 @@
-# Clés et secrets : ne JAMAIS les mettre dans git
-.env
-# Données locales (base, photos, journaux)
-data/
-# Environnement Python
-.venv/
 __pycache__/
 *.pyc
+.env
+.venv/
+data/
+*.sqlite
+node_modules/
+tests/_sortie/
