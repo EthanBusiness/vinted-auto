@@ -118,7 +118,10 @@ def ajouter():
             flash("Colle au moins un lien Shein (un par ligne).", "erreur")
             return render_template("ajouter.html", comptes=comptes, erreur_comptes=erreur_comptes)
         for lien in liens:
-            db.ajouter_article(lien, choisis)
+            aid = db.ajouter_article(lien, choisis)
+            gid = shein.id_depuis_lien(lien)
+            if gid:
+                db.maj_article(aid, sku=f"SHEIN-{gid}")
         flash(f"{len(liens)} article(s) ajouté(s). L'analyse démarre, la page se met à jour toute seule.", "ok")
         return redirect(url_for("articles"))
     return render_template("ajouter.html", comptes=comptes, erreur_comptes=erreur_comptes)
@@ -161,7 +164,7 @@ def plan_b(article_id):
     if not texte and not html:
         flash("Colle le texte de la fiche OU choisis le fichier .html enregistré.", "erreur")
         return redirect(url_for("fiche_article", article_id=article_id))
-    db.maj_article(article_id, texte_colle=texte or None, html_source=html, statut="a_analyser", erreur=None)
+    db.maj_article(article_id, texte_colle=texte or None, html_source=html, donnees=None, statut="a_analyser", erreur=None)
     flash("C'est reparti : l'analyse recommence.", "ok")
     return redirect(url_for("fiche_article", article_id=article_id))
 
@@ -172,6 +175,59 @@ def relancer(article_id):
     db.maj_article(article_id, statut="a_analyser", erreur=None)
     flash("Analyse relancée.", "ok")
     return redirect(url_for("fiche_article", article_id=article_id))
+
+
+# ---------------------------------------------------------------- favori « Envoyer à Vinted Auto »
+
+@app.route("/favori")
+@connecte("admin")
+def favori():
+    from urllib.parse import quote
+
+    with open(os.path.join(DOSSIER, "static", "favori_source.js"), encoding="utf-8") as f:
+        code = f.read()
+    code = code.replace("__SITE__", request.host_url)
+    lignes = [l.strip() for l in code.splitlines() if l.strip() and not l.strip().startswith("//")]
+    lien_favori = "javascript:" + quote(" ".join(lignes), safe="")
+    return render_template("favori.html", lien_favori=lien_favori)
+
+
+@app.route("/import", methods=["GET", "POST"])
+@connecte("admin")
+def importer():
+    if request.method == "GET":
+        try:
+            comptes = scalency.comptes()
+        except scalency.ErreurScalency:
+            comptes = []
+        return render_template("import.html", comptes=comptes)
+
+    corps = request.get_json(silent=True) or {}
+    d = corps.get("donnees") or {}
+    if not isinstance(d, dict) or not (d.get("titre") or d.get("texte")):
+        return {"ok": False, "message": "Aucune fiche reçue. Recommence depuis la page Shein."}, 400
+    gid = str(d.get("goods_id") or shein.id_depuis_lien(d.get("lien", "")) or "")
+    sku = f"SHEIN-{gid}" if gid else (d.get("ref_shein") or "")
+    donnees = {
+        "sku": sku,
+        "goods_id": gid,
+        "ref_shein": str(d.get("ref_shein") or "")[:60],
+        "titre": str(d.get("titre") or "")[:300],
+        "prix": str(d.get("prix") or "")[:120],
+        "images": [str(u) for u in (d.get("images") or []) if str(u).startswith("https://")][:8],
+        "attributs": [str(x)[:260] for x in (d.get("attributs") or [])][:40],
+        "tailles": [str(x)[:12] for x in (d.get("tailles") or [])][:15],
+        "texte": str(d.get("texte") or "")[:15000],
+    }
+    existant = db.article_en_attente_par_sku(sku) if sku else None
+    if existant:
+        db.maj_article(existant, donnees=donnees, statut="a_analyser", erreur=None)
+        aid = existant
+    else:
+        comptes = [c for c in (corps.get("comptes") or []) if isinstance(c, str)]
+        aid = db.ajouter_article(d.get("lien") or None, comptes)
+        db.maj_article(aid, donnees=donnees, sku=sku or None)
+    return {"ok": True, "url": url_for("fiche_article", article_id=aid), "existant": bool(existant)}
 
 
 # ---------------------------------------------------------------- employée (étape 3)
@@ -188,7 +244,12 @@ def file_photos():
 def analyser(a):
     """Lit la fiche Shein puis demande à Claude le prompt Gemini."""
     infos_page = None
-    if a["texte_colle"]:
+    if a.get("donnees"):
+        # Fiche envoyée par le favori depuis ton navigateur (connecté à ton compte Shein)
+        infos_page = dict(a["donnees"])
+        if infos_page.get("prix"):
+            infos_page["attributs"] = [f"Prix Shein (mon compte) : {infos_page['prix']}"] + infos_page.get("attributs", [])
+    elif a["texte_colle"]:
         infos_page = {
             "sku": a["sku"] or (f"SHEIN-{shein.id_depuis_lien(a['lien'])}" if shein.id_depuis_lien(a["lien"]) else ""),
             "titre": "", "images": a["images"], "attributs": [], "tailles": [],
@@ -211,9 +272,12 @@ def analyser(a):
         return
 
     db.enregistrer_cout(a["id"], "fiche + prompt Gemini", ia.MODELE, usage.input_tokens, usage.output_tokens, ia.cout_usd(usage))
+    infos = fiche.model_dump()
+    if a.get("donnees") and a["donnees"].get("prix"):
+        infos["prix_shein"] = a["donnees"]["prix"]
     db.maj_article(
         a["id"],
-        infos=fiche.model_dump(),
+        infos=infos,
         prompt_gemini=ia.construire_prompt_gemini(fiche),
         statut="a_photographier",
         erreur=None,

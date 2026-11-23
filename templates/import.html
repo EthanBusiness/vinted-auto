@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titre %}Import Shein · Vinted Auto{% endblock %}
+{% block contenu %}
+<h1>Fiche reçue de Shein</h1>
+<div id="vide" class="carte" style="display:none">Aucune fiche reçue. Ouvre une fiche produit Shein et clique sur le favori <b>📥 Envoyer à Vinted Auto</b>.</div>
+<div id="fiche" class="carte" style="display:none">
+  <h3 id="titre" style="margin-top:0"></h3>
+  <p id="prix"></p>
+  <div class="galerie" id="galerie"></div>
+  <label>Compte(s) Vinted cible</label>
+  <div class="comptes">
+    {% for c in comptes %}
+      <label class="{{ '' if c.actif else 'inactif' }}"><input type="checkbox" name="comptes" value="{{ c.id }}|{{ c.login }}"> {{ c.login }}{% if c.actif %} ●{% endif %}</label>
+    {% else %}
+      <span class="doux">Liste des comptes indisponible (clé Scalency ?). Tu pourras les choisir plus tard.</span>
+    {% endfor %}
+  </div>
+  <p class="doux" style="font-size:13px">Si ce produit attend déjà dans le site, il garde les comptes choisis au départ.</p>
+  <p><button class="btn gros" id="envoyer">Analyser et créer le prompt</button> <span id="etat" class="doux"></span></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let donnees = null;
+try { donnees = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch (e) {}
+if (!donnees) { document.getElementById('vide').style.display = ''; }
+else {
+  document.getElementById('fiche').style.display = '';
+  document.getElementById('titre').textContent = donnees.titre || 'Produit Shein';
+  document.getElementById('prix').textContent = donnees.prix ? 'Ton prix Shein : ' + donnees.prix : '';
+  (donnees.images || []).slice(0, 6).forEach(u => {
+    const i = document.createElement('img'); i.src = u; i.referrerPolicy = 'no-referrer';
+    document.getElementById('galerie').appendChild(i);
+  });
+}
+document.getElementById('envoyer')?.addEventListener('click', async () => {
+  const comptes = [...document.querySelectorAll('input[name=comptes]:checked')].map(c => c.value);
+  document.getElementById('etat').textContent = 'Envoi…';
+  const r = await fetch('{{ url_for("importer") }}', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({donnees, comptes})});
+  const j = await r.json().catch(() => ({}));
+  if (j.ok) { history.replaceState(null, '', location.pathname); location.href = j.url; }
+  else document.getElementById('etat').textContent = j.message || 'Erreur, réessaie.';
+});
+</script>
+{% endblock %}

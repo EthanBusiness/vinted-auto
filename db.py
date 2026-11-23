@@ -54,6 +54,10 @@ def initialiser():
             );
             """
         )
+        # Colonnes ajoutées après la première version
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(articles)")}
+        if "donnees" not in cols:
+            con.execute("ALTER TABLE articles ADD COLUMN donnees TEXT")
 
 
 def maintenant():
@@ -71,7 +75,7 @@ def ajouter_article(lien, comptes, texte_colle=None, html_source=None):
 
 
 def maj_article(article_id, **champs):
-    for cle in ("comptes", "images", "infos"):
+    for cle in ("comptes", "images", "infos", "donnees"):
         if cle in champs and not isinstance(champs[cle], str) and champs[cle] is not None:
             champs[cle] = json.dumps(champs[cle], ensure_ascii=False)
     cols = ", ".join(f"{k} = ?" for k in champs)
@@ -86,6 +90,7 @@ def _decoder(ligne):
     a["comptes"] = json.loads(a["comptes"] or "[]")
     a["images"] = json.loads(a["images"] or "[]")
     a["infos"] = json.loads(a["infos"]) if a["infos"] else {}
+    a["donnees"] = json.loads(a["donnees"]) if a.get("donnees") else None
     a["statut_texte"] = STATUTS.get(a["statut"], a["statut"])
     return a
 
@@ -154,3 +159,14 @@ def cout_du_jour():
             (jour + "%",),
         ).fetchone()
         return l["total"], l["nb"]
+
+
+def article_en_attente_par_sku(sku):
+    """Article pas encore analysé avec ce SKU (pour y rattacher un import du favori)."""
+    with connexion() as con:
+        l = con.execute(
+            "SELECT id FROM articles WHERE sku = ? AND statut IN ('lecture_echouee','erreur_ia','a_analyser')"
+            " ORDER BY id DESC LIMIT 1",
+            (sku,),
+        ).fetchone()
+        return l["id"] if l else None

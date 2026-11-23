@@ -14,6 +14,7 @@
   {% if session.role == 'admin' %}
   <a href="{{ url_for('ajouter') }}" class="{{ 'actif' if request.endpoint=='ajouter' }}">➕ Coller des liens</a>
   <a href="{{ url_for('articles') }}" class="{{ 'actif' if request.endpoint=='articles' }}">📋 Articles</a>
+  <a href="{{ url_for('favori') }}" class="{{ 'actif' if request.endpoint=='favori' }}">📥 Favori Shein</a>
   {% endif %}
   <a href="{{ url_for('file_photos') }}" class="{{ 'actif' if request.endpoint=='file_photos' }}">📸 À photographier</a>
   <span class="droite">{{ session.nom }} · <a href="{{ url_for('deconnexion') }}">Se déconnecter</a></span>

@@ -19,6 +19,10 @@
     {% if a.statut == 'erreur_ia' %}
       <form method="post" action="{{ url_for('relancer', article_id=a.id) }}"><button class="btn gris">Réessayer</button></form>
     {% endif %}
+    <h3>La solution la plus simple</h3>
+    <p>{% if a.lien %}<a class="btn" href="{{ a.lien }}" target="_blank" rel="noreferrer">Ouvrir la fiche sur Shein</a>{% endif %}
+      puis clique sur ton favori <b>📥 Envoyer à Vinted Auto</b> : l'article repart tout seul, avec ton prix.
+      <a href="{{ url_for('favori') }}">Installer le favori</a></p>
     <h3>Plan B</h3>
     <p class="doux">Ouvre le lien Shein dans ton navigateur, puis au choix :<br>
       1) sélectionne tout le texte de la fiche (Ctrl+A puis Ctrl+C) et colle-le ci-dessous, <b>ou</b><br>
@@ -65,6 +69,7 @@
     <div><b>Détails</b>{{ a.infos.details or '—' }}</div>
     <div><b>Tailles</b>{{ (a.infos.tailles_disponibles or [])|join(', ') or '—' }}</div>
     <div><b>Mesures</b>{{ a.infos.mesures or '—' }}</div>
+    {% if a.infos.prix_shein and session.role == 'admin' %}<div><b>Ton prix Shein</b>{{ a.infos.prix_shein }}</div>{% endif %}
   </div>
 </div>
 {% endif %}
