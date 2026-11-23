@@ -138,6 +138,7 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
       [det.images_article.length === 2 && !det.images_article.some(u => /tableau|guide02/.test(u)), "2 photos gardées : le tableau des tailles est écarté (hors couleur + tri par l'IA) : " + det.images_article],
       [det.fiche.images[0] === "https://img.ltwebstatic.com/images3_pi/2023/10/13/02/16971684628a3ce766b3e854f3cedee214437dd785.jpg", "lien photo Shein en pleine taille : " + det.fiche.images[0]],
       [det.fiche.prix === 10.05, "prix Shein lu sur la page (10,05 €)"],
+      [JSON.stringify(det.attributs) === '{"length":[903]}' && det.attributs_libelles[0] === "Longueur : Midi", "champ Vinted obligatoire (longueur) rempli par l'IA : " + JSON.stringify(det.attributs)],
     ];
     verifs.forEach(([v, m]) => { if (!v) throw new Error("Vérification ratée : " + m); });
     ok("Annonce complète : titre, description + mesures en français, taille, catégorie, couleur, matières, prix en ,90, prompts cadrés, liens photos");
@@ -240,7 +241,7 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
     const attendu = { title: det.titre, price: 19.9, catalog_id: 1774, status_id: 2, brand_id: 1, size_id: 4, color_ids: [5], package_size_id: 1 };
     for (const k in attendu) if (JSON.stringify(p1[k]) !== JSON.stringify(attendu[k])) throw new Error(`champ ${k} envoyé à Scalency : ${JSON.stringify(p1[k])}`);
     if (p1.photos.length !== 2 || !p1.photos[0].includes("/storage/v1/object/public/vinted-photos/")) throw new Error("photos : " + p1.photos);
-    if (JSON.stringify(p1.item_attributes) !== JSON.stringify([{ code: "material", ids: [45, 53] }])) throw new Error("item_attributes");
+    if (JSON.stringify(p1.item_attributes) !== JSON.stringify([{ code: "material", ids: [45, 53] }, { code: "length", ids: [903] }])) throw new Error("item_attributes : " + JSON.stringify(p1.item_attributes));
     const p2 = vrais.find(p => p.account_id === "vt-1" && p !== p1);
     if (!p2 || !(p2.delay_minutes >= 19)) throw new Error("étalement absent : " + JSON.stringify(p2 && p2.delay_minutes));
     ok(`Corps envoyé à Scalency conforme à la doc ; 2e annonce du même compte décalée de ${p2.delay_minutes} min`);

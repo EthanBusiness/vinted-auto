@@ -92,6 +92,7 @@ def cx() -> sqlite3.Connection:
 # Colonnes ajoutées après la première version (les anciennes bases sont complétées au démarrage)
 COLONNES_AJOUTEES = {
     "comptes": {"scene_fichier": "TEXT DEFAULT ''", "scene_description": "TEXT DEFAULT ''", "prompt_scene": "TEXT DEFAULT ''"},
+    "annonces": {"attributs": "TEXT DEFAULT '{}'"},   # autres champs Vinted de la catégorie (ex : longueur de jupe)
 }
 
 

@@ -55,6 +55,7 @@ def json_annonce(a: dict, detail=False) -> dict:
             "description": a["description"], "titre_base": a["titre_base"], "catalog_id": a["catalog_id"],
             "catalogue": a["catalogue"], "size_id": a["size_id"], "status_id": a["status_id"],
             "color_ids": json.loads(a["color_ids"] or "[]"), "material_ids": json.loads(a["material_ids"] or "[]"),
+            "attributs": json.loads(a.get("attributs") or "{}"), "attributs_libelles": libelles_attributs(a),
             "package_size_id": a["package_size_id"], "prompt_face": a["prompt_face"], "prompt_dos": a["prompt_dos"],
             "essai": a["essai"], "cout_eur": round((a["cout"] or 0) * float(db.reglage("eur_par_usd") or 0.92), 4),
             "fiche": {k: fiche.get(k) for k in ("titre", "couleur", "prix", "prix_texte", "images", "tailles", "attributs", "categorie", "lien")},
@@ -83,6 +84,24 @@ def decrire_scenes_manquantes():
             db.ex("UPDATE comptes SET scene_description = ? WHERE id = ?", (desc, c["id"]))
             for a in db.q("SELECT id FROM annonces WHERE compte_id = ? AND statut IN ('a_photographier', 'prete', 'echec') AND titre_base != ''", (c["id"],)):
                 atelier.refaire_prompts(a["id"])
+
+
+def libelles_attributs(a: dict) -> list:
+    """« Longueur : Jupe longue » pour l'affichage."""
+    choix = json.loads(a.get("attributs") or "{}")
+    if not choix or not a.get("catalog_id"):
+        return []
+    try:
+        details = scalency.categorie(a["catalog_id"])
+    except scalency.ErreurScalency:
+        return []
+    res = []
+    for at in atelier.autres_attributs(details):
+        noms = {o["id"]: o["title"] for o in at.get("options") or []}
+        ids = choix.get(at["code"]) or []
+        if ids:
+            res.append(f"{(at.get('title') or at['code']).replace(' (recommandé)', '')} : {', '.join(noms.get(i, str(i)) for i in ids)}")
+    return res
 
 
 def copier_extension():
@@ -333,6 +352,8 @@ def r_annonce_modifier(h, id_):
         atelier.appliquer_taille(a["id"], str(d["taille"]))
     elif "catalog_id" in champs:
         atelier.appliquer_taille(a["id"], a["taille"])
+    if "catalog_id" in champs or "taille" in d:
+        atelier.remplir_attributs(a["id"])
     if "size_id" in d and d["size_id"]:
         db.maj("annonces", a["id"], size_id=int(d["size_id"]))
     textes = {}

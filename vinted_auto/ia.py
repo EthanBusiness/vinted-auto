@@ -196,6 +196,43 @@ def trier_photos(images: list):
     return [i for i in ids if isinstance(i, int) and 0 <= i < len(images)]
 
 
+def choisir_attributs(article: dict, attributs: list) -> dict:
+    """Champs Vinted de la catégorie autres que la matière (ex : longueur de la jupe) -> {code: [ids]}."""
+    liste = []
+    for a in attributs:
+        opts = ", ".join(f"{o['id']} = {o['title']}" for o in a.get("options") or [])
+        liste.append(f"- code « {a['code']} » : {a.get('title') or a['code']}"
+                     f"{' (OBLIGATOIRE)' if a.get('required') else ''} ; {a.get('selection_limit') or 1} choix maximum ; "
+                     f"options : {opts}")
+    schema = {"type": "object", "additionalProperties": False, "required": ["choix"],
+              "properties": {"choix": {"type": "array", "items": {
+                  "type": "object", "additionalProperties": False, "required": ["code", "ids"],
+                  "properties": {"code": {"type": "string"}, "ids": {"type": "array", "items": {"type": "integer"}}}}}}}
+    texte, usd = _appel(
+        "champs Vinted", max_tokens=600,
+        output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
+        messages=[{"role": "user", "content":
+                   "CHOIX_ATTRIBUTS. Remplis ces champs du formulaire Vinted pour l'article ci-dessous. Pour chaque champ, "
+                   "choisis le ou les ids d'options qui correspondent le mieux (pour une longueur, sers-toi de la mesure de "
+                   "longueur et de la description : mini au-dessus du genou, midi sous le genou, longue jusqu'aux chevilles). "
+                   "Remplis toujours les champs OBLIGATOIRES.\n\nChamps :\n" + "\n".join(liste)
+                   + "\n\nArticle :\n" + json.dumps(article, ensure_ascii=False)}],
+    )
+    try:
+        choix = json.loads(texte).get("choix") or []
+    except ValueError:
+        raise ErreurIA("Réponse illisible pour les champs Vinted.")
+    valides = {a["code"]: ({o["id"] for o in a.get("options") or []}, int(a.get("selection_limit") or 1)) for a in attributs}
+    res = {}
+    for c in choix:
+        if c.get("code") in valides:
+            ok, n = valides[c["code"]]
+            ids = [i for i in c.get("ids") or [] if i in ok][:n]
+            if ids:
+                res[c["code"]] = ids
+    return res
+
+
 def tester():
     texte, usd = _appel("test de la clé", max_tokens=1000, output_config={"effort": "low"},
                         messages=[{"role": "user", "content": "Réponds juste : OK"}])

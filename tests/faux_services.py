@@ -27,7 +27,9 @@ CATALOGUES = [
     {"id": 2050, "title": "Vêtements", "parent_id": 5},
 ]
 DETAIL = {
-    "attributes": [{"code": "material", "options": [{"id": 45, "title": "Polyester"}, {"id": 53, "title": "Élasthanne"}, {"id": 44, "title": "Coton"}]}],
+    "attributes": [{"code": "material", "options": [{"id": 45, "title": "Polyester"}, {"id": 53, "title": "Élasthanne"}, {"id": 44, "title": "Coton"}]},
+                   {"code": "length", "title": "Longueur", "required": True, "selection_limit": 1,
+                    "options": [{"id": 901, "title": "Mini"}, {"id": 902, "title": "Genou"}, {"id": 903, "title": "Midi"}, {"id": 904, "title": "Longue"}]}],
     "conditions": [{"id": 2, "title": "Très bon état"}, {"id": 6, "title": "Neuf avec étiquette"}],
     "size_groups": [
         {"id": 4, "title": "Taille", "sizes": [{"id": 2, "title": "XS / 34 / 6"}, {"id": 3, "title": "S / 36 / 8"}, {"id": 4, "title": "M / 38 / 10"}, {"id": 5, "title": "L / 40 / 12"}, {"id": 6, "title": "XL / 42 / 14"}, {"id": 7, "title": "XXL / 44 / 16"}]},
@@ -79,6 +81,8 @@ def reponse_claude(corps):
         photos = [b for b in corps["messages"][0]["content"] if b.get("type") == "image"]
         garder = [i for i, b in enumerate(photos) if b"guide02" not in base64.b64decode(b["source"]["data"])]
         texte = json.dumps({"photos_article": garder})
+    elif fmt and "CHOIX_ATTRIBUTS" in texte_user:
+        texte = json.dumps({"choix": [{"code": "length", "ids": [903, 999]}]})
     elif fmt:
         m = re.search(r"Nombre d'annonces à rédiger : (\d+)", texte_user)
         n = int(m.group(1)) if m else 1
