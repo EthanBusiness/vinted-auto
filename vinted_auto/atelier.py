@@ -223,9 +223,40 @@ def generer(produit_id: int, annonce_ids=None):
             )
             db.maj("annonces", a["id"], **champs)
             appliquer_taille(a["id"], taille, details)
+            remplir_attributs(a["id"], details)
             refaire_prompts(a["id"])
             statut = "prete" if (a.get("photo_face") and a.get("photo_dos")) else "a_photographier"
             db.maj("annonces", a["id"], statut=statut)
+
+
+def autres_attributs(details: dict) -> list:
+    return [x for x in (details or {}).get("attributes") or [] if x.get("code") != "material" and x.get("options")]
+
+
+def remplir_attributs(annonce_id: int, details=None):
+    """Champs Vinted propres à la catégorie (longueur de jupe…) choisis par l'IA d'après la fiche et les mesures."""
+    a = db.q1("SELECT * FROM annonces WHERE id = ?", (annonce_id,))
+    if details is None:
+        try:
+            details = scalency.categorie(a["catalog_id"]) if a["catalog_id"] else {}
+        except scalency.ErreurScalency:
+            details = {}
+    attrs = autres_attributs(details)
+    if not attrs:
+        db.maj("annonces", annonce_id, attributs={})
+        return
+    p = db.q1("SELECT * FROM produits WHERE id = ?", (a["produit_id"],))
+    fiche = json.loads(p["donnees"] or "{}")
+    analyse = json.loads(p["analyse"] or "{}")
+    article = {"titre": fiche.get("titre"), "description_visuelle": analyse.get("description_visuelle"),
+               "categorie": a["catalogue"], "taille": a["taille"], "mesures": mesures_texte(fiche, a["taille"]),
+               "attributs_shein": (fiche.get("attributs") or [])[:25]}
+    try:
+        choix = ia.choisir_attributs(article, attrs)
+    except ia.ErreurIA as e:
+        db.maj("annonces", annonce_id, attributs={}, erreur=f"Champs Vinted à remplir : {e}")
+        return
+    db.maj("annonces", annonce_id, attributs=choix)
 
 
 # Noms des mesures Shein (fiche en anglais) -> français
@@ -493,9 +524,15 @@ def corps_scalency(a: dict, p: dict, urls: list) -> dict:
     couleurs = json.loads(a["color_ids"] or "[]")
     if couleurs:
         corps["color_ids"] = couleurs
+    attrs = []
     mat = json.loads(a["material_ids"] or "[]")
     if mat:
-        corps["item_attributes"] = [{"code": "material", "ids": mat}]
+        attrs.append({"code": "material", "ids": mat})
+    for code, ids in json.loads(a.get("attributs") or "{}").items():
+        if ids:
+            attrs.append({"code": code, "ids": ids})
+    if attrs:
+        corps["item_attributes"] = attrs
     return corps
 
 
