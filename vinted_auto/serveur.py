@@ -650,8 +650,11 @@ def main():
     db.init()
     copier_extension()
     port = int(config.get("PORT", "8000") or 8000)
+    # Accès depuis un autre appareil seulement si un mot de passe est choisi (sinon : ce PC uniquement,
+    # et Windows n'affiche pas d'alerte du pare-feu).
+    hote = "0.0.0.0" if (config.get("EMPLOYEE_PASSWORD") or config.get("ADMIN_PASSWORD")) else "127.0.0.1"
     try:
-        s = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        s = ThreadingHTTPServer((hote, port), Handler)
     except OSError:
         print(f"\n  ERREUR : le port {port} est déjà utilisé par un autre programme.")
         print("  Ferme l'autre fenêtre noire de Vinted Auto, ou redémarre le PC.")
