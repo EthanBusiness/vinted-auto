@@ -16,7 +16,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import atelier, config, db, ia, maj, navigateur, paquet, photos, raccourcis, scalency
+from . import atelier, config, db, ia, maj, navigateur, paquet, photos, raccourcis, reseau, scalency
 from .config import CODE, DONNEES, IMAGES, VERSION
 
 WEB = CODE / "web"
@@ -649,6 +649,11 @@ def r_reglages_enregistrer(h):
     for k, v in (d.get("reglages") or {}).items():
         if k in db.REGLAGES_DEFAUT:
             db.set_reglage(k, str(v).strip().replace(",", "."))
+    # Premier mot de passe choisi : le site redémarre pour s'ouvrir aux autres appareils.
+    if SERVEUR.get("hote") == "127.0.0.1" and (config.get("EMPLOYEE_PASSWORD") or config.get("ADMIN_PASSWORD")):
+        h.json({"redemarre": True})
+        threading.Thread(target=_redemarrer, daemon=True).start()
+        return
     r_reglages(h)
 
 
@@ -710,6 +715,13 @@ def r_chrome_essayer(h):
     h.json({"ok": True, "chrome": ok})
 
 
+def r_acces(h):
+    d = reseau.adresses() if h.est_local() else {"local": [], "tailscale": [], "tailscale_installe": False}
+    d.update({"port": int(config.get("PORT", "8000") or 8000), "ouvert": SERVEUR.get("hote") == "0.0.0.0",
+              "mdp_employee": bool(config.get("EMPLOYEE_PASSWORD"))})
+    h.json(d)
+
+
 def r_ouvrir_extension(h):
     copier_extension()
     if os.name == "nt" and h.est_local():
@@ -759,6 +771,7 @@ ROUTES = [
     ("POST", r"/api/maj", r_maj, ADMIN),
     ("POST", r"/api/extension/ouvrir", r_ouvrir_extension, ADMIN),
     ("GET", r"/api/demarrage-auto", r_demarrage, ADMIN),
+    ("GET", r"/api/acces", r_acces, ADMIN),
     ("POST", r"/api/chrome-profil", r_chrome_essayer, ADMIN),
     ("POST", r"/api/demarrage-auto", r_demarrage_changer, ADMIN),
 ]
@@ -780,6 +793,7 @@ def main():
         sys.exit(3)
     s.daemon_threads = True
     SERVEUR["s"] = s
+    SERVEUR["hote"] = hote
     stop = threading.Event()
     threading.Thread(target=atelier.boucle_suivi, args=(stop,), daemon=True).start()
     if config.get("ANTHROPIC_API_KEY"):

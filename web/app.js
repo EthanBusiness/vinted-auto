@@ -643,9 +643,11 @@ function pageReglages() {
       '<div><label>Minutes entre 2 publications d\'un même compte</label><input data-r="espacement_min" value="' + esc(g.espacement_min) + '"></div></div>' +
       '<label><input type="checkbox" data-r="publier_auto" style="width:auto"' + (g.publier_auto === "1" ? " checked" : "") + "> Publier automatiquement dès que les photos sont validées</label>" +
       '<button class="principal" id="sauverR">💾 Enregistrer</button></div>' +
-      '<div class="carte"><h2>👩‍💻 Accès de ton employée (à distance)</h2><p class="aide">Sur ce PC, tu n\'as pas besoin de mot de passe. Pour que ton employée se connecte depuis chez elle, choisis les mots de passe ici (l\'installation de Tailscale pour l\'accès à distance viendra ensuite).</p>' +
-      cle("EMPLOYEE_PASSWORD", "Ton employée ne verra que la page Photos.", "") + cle("ADMIN_PASSWORD", "Pour toi, si tu ouvres le site depuis un autre appareil.", "") +
-      '<button class="principal" id="sauverM">💾 Enregistrer les mots de passe</button></div>' +
+      '<div class="carte" id="carteAcces"><h2>👩‍💻 Accès de ton employée</h2><p class="aide">Elle ouvre le site depuis son ordinateur, avec un mot de passe, et ne voit que la page <b>Photos</b>. Ce PC doit rester allumé avec Vinted Auto lancé.</p>' +
+      "<h3>1. Choisis son mot de passe</h3>" +
+      cle("EMPLOYEE_PASSWORD", "La première fois, le site redémarre tout seul (quelques secondes). Si Windows demande d'autoriser Python sur le réseau, clique sur <b>Autoriser</b>.", "") +
+      '<details><summary class="aide">Un mot de passe pour toi aussi (si tu ouvres le site depuis ton téléphone ou un autre PC)</summary>' + cle("ADMIN_PASSWORD", "Toi, tu verras tout le site.", "") + "</details>" +
+      '<button class="principal" id="sauverM">💾 Enregistrer</button><div id="acces"></div></div>' +
       '<div class="carte"><h2>🖥️ Ouvrir Vinted Auto facilement</h2>' +
       '<p>Tu as 3 façons de l\'ouvrir, sans chercher le dossier :</p><ol class="etapes">' +
       "<li>Double-clique sur l'icône <b>Vinted Auto</b> (le cintre bleu) sur ton <b>Bureau</b>.</li>" +
@@ -661,7 +663,10 @@ function pageReglages() {
     function enregistrerCles(btn) {
       var cles = {}; $$("[data-cle]").forEach(function (i) { if (i.value.trim()) cles[i.dataset.cle] = i.value.trim(); });
       if (!Object.keys(cles).length) return toast("Rien à enregistrer : colle d'abord une clé.");
-      api("POST", "/api/reglages", { cles: cles }).then(function () { toast("Enregistré ✔"); rafraichirEtat().then(pageReglages); }).catch(function (e) { toast(e.message); });
+      api("POST", "/api/reglages", { cles: cles }).then(function (r) {
+        if (r && r.redemarre) { toast("Enregistré ✔ Le site redémarre pour s'ouvrir à ton employée…", 9000); attendreRedemarrage(); return; }
+        toast("Enregistré ✔"); rafraichirEtat().then(pageReglages);
+      }).catch(function (e) { toast(e.message); });
     }
     $("#sauver").onclick = enregistrerCles; $("#sauverM").onclick = enregistrerCles;
     $("#sauverR").onclick = function () {
@@ -684,6 +689,7 @@ function pageReglages() {
         toast(sel.value ? (r.chrome ? "✔ Enregistré : le site s'ouvre maintenant dans ce profil Chrome (tu peux fermer cet onglet)." : "Enregistré, mais Chrome est introuvable : le navigateur par défaut sera utilisé.") : "✔ Le site s'ouvrira dans le navigateur par défaut.", 9000);
       }).catch(function (e) { toast(e.message, 7000); });
     };
+    api("GET", "/api/acces").then(blocAcces).catch(function () { /* rien */ });
     api("GET", "/api/demarrage-auto").then(function (s) {
       if (!s.disponible) return;
       $("#demarrage").innerHTML = '<label><input type="checkbox" id="demAuto" style="width:auto"' + (s.actif ? " checked" : "") + "> Lancer Vinted Auto tout seul quand j'allume le PC</label>" +
@@ -703,6 +709,40 @@ function pageReglages() {
       }).catch(function (e) { toast(e.message, 8000); b.disabled = false; b.textContent = "⬆️ Mettre à jour maintenant"; });
     };
   }).catch(function (e) { $("#r").innerHTML = '<p class="erreur">' + esc(e.message) + "</p>"; });
+}
+
+function attendreRedemarrage() {
+  var essais = 0; var t = setInterval(function () { essais++; fetch("/api/ping").then(function (x) { if (x.ok && essais > 2) { clearInterval(t); location.reload(); } }).catch(function () { /* redémarre */ }); if (essais > 60) clearInterval(t); }, 1500);
+}
+
+function blocAcces(a) {
+  var el = $("#acces"); if (!el) return;
+  if (!a.mdp_employee) { el.innerHTML = '<p class="aide">Une fois son mot de passe enregistré, tu verras ici le lien à lui envoyer.</p>'; return; }
+  if (!a.ouvert) { el.innerHTML = '<p class="erreur">Le site doit redémarrer pour s\'ouvrir à elle : ferme la fenêtre noire puis relance Vinted Auto.</p>'; return; }
+  var lien = function (ip) { return "http://" + ip + ":" + a.port; };
+  var ts = a.tailscale[0], loc = a.local[0];
+  var html = "<h3>2. Où travaille-t-elle ?</h3>" +
+    '<div class="grille2"><div><h3>🏠 Ici, sur le même wifi</h3>' +
+    (loc ? '<p>Elle ouvre ce lien dans Chrome :</p><p><code>' + esc(lien(loc)) + '</code> <button class="petit" data-copier-lien="' + esc(lien(loc)) + '">📋 Copier</button></p>'
+         : '<p class="aide">Ce PC n\'est pas connecté à un wifi ou un réseau local.</p>') +
+    '</div><div><h3>🌍 De chez elle (recommandé : Tailscale)</h3>' +
+    (ts ? '<p class="ok">✔ Tailscale marche sur ce PC.</p><p>Son lien :</p><p><code>' + esc(lien(ts)) + '</code> <button class="petit" data-copier-lien="' + esc(lien(ts)) + '">📋 Copier</button></p>' +
+          '<p class="aide">Pour qu\'elle y ait droit : sur <a href="https://login.tailscale.com/admin/machines" target="_blank" rel="noopener">login.tailscale.com › Machines</a>, clique sur « ⋯ » à côté de ce PC' + (a.tailscale_nom ? " (<b>" + esc(a.tailscale_nom) + "</b>)" : "") + " › <b>Share</b> et envoie-lui le lien d'invitation. Elle installe Tailscale, se connecte et accepte l'invitation.</p>"
+        : '<ol class="etapes"><li>Installe <b>Tailscale</b> sur ce PC : <a href="https://tailscale.com/download/windows" target="_blank" rel="noopener">tailscale.com/download</a>, puis connecte-toi (avec ton compte Google par exemple).</li>' +
+          "<li>Reviens ici et appuie sur <b>F5</b> : son lien s'affichera.</li></ol>" +
+          '<p class="aide">Tailscale est gratuit. Il relie vos deux ordinateurs de façon privée : le site n\'est jamais visible sur Internet.</p>') +
+    "</div></div>";
+  var l = ts || loc;
+  if (l) {
+    var msg = "Bonjour ! Voici le site Vinted Auto pour faire les photos / Here is the Vinted Auto site for the photos:\n" + lien(l) + "\n" +
+      (ts ? "1. Installe Tailscale / Install Tailscale: https://tailscale.com/download\n2. Accepte mon invitation Tailscale (lien envoyé à part) / Accept my Tailscale invite (sent separately)\n3. " : "") +
+      "Ouvre le lien dans Chrome, entre le mot de passe que je t'envoie à part. Tu peux passer le site en anglais avec le bouton de langue en haut. / Open the link in Chrome, enter the password I send you separately. Switch to English with the language button at the top.";
+    html += '<h3>3. Envoie-lui le message</h3><button class="principal" id="copierMsg">📋 Copier le message pour ton employée</button>' +
+      '<p class="aide">Le message est en français et en anglais. Envoie-lui le mot de passe à part.</p>';
+    el.innerHTML = html;
+    $("#copierMsg").onclick = function () { copier(msg, "Message"); };
+  } else el.innerHTML = html;
+  $$("[data-copier-lien]", el).forEach(function (b) { b.onclick = function () { copier(b.dataset.copierLien, "Lien"); }; });
 }
 
 // ------------------------------------------------------------ page : installer l'extension
