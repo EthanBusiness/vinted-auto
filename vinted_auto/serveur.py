@@ -517,8 +517,14 @@ def r_categorie(h, id_):
 
 # ---- comptes
 
+def avec_prompt_profil(comptes):
+    for c in comptes:
+        c["prompt_profil"] = prompt_profil(c)
+    return comptes
+
+
 def r_comptes(h):
-    h.json({"comptes": db.q("SELECT * FROM comptes ORDER BY relie DESC, login")})
+    h.json({"comptes": avec_prompt_profil(db.q("SELECT * FROM comptes ORDER BY relie DESC, login"))})
 
 
 def r_comptes_sync(h):
@@ -536,6 +542,22 @@ def _compte(id_):
 def _rafraichir_prompts(compte_id):
     for a in db.q("SELECT id FROM annonces WHERE compte_id = ? AND statut IN ('a_photographier', 'prete', 'echec') AND titre_base != ''", (compte_id,)):
         atelier.refaire_prompts(a["id"])
+
+
+def prompt_profil(c: dict) -> str:
+    """Prompt Gemini pour la photo de profil du compte : même femme, même décor que la scène, style Instagram."""
+    vu = c.get("scene_description") or ""
+    return "\n".join(x for x in [
+        "Crée une photo de profil pour un compte Vinted, à partir de la photo jointe (la scène du compte"
+        + (f" : {vu}" if vu else "") + ").",
+        "Garde exactement la même femme (même peau, même silhouette, mêmes cheveux, mêmes bijoux) et le même décor, "
+        "avec la même lumière naturelle.",
+        "Style photo Instagram naturelle et tendance, prise à l'iPhone : par exemple un selfie miroir où le téléphone cache "
+        "le visage, ou une photo de trois quarts dos, tête légèrement tournée, cheveux devant le visage.",
+        "On ne voit PAS vraiment son visage (ni les yeux ni le nez), mais on reconnaît sa silhouette et le décor.",
+        "Tenue simple et jolie, dans le même style que le compte. Cadrage CARRÉ 1:1, sujet bien centré pour un rond de "
+        "photo de profil, rendu authentique (pas studio), sans texte, sans logo, sans filigrane.",
+    ] if x)
 
 
 def r_compte_modifier(h, id_):
@@ -556,7 +578,7 @@ def r_compte_modifier(h, id_):
 
 def r_compte_image(h, id_, quoi):
     c = _compte(id_)
-    if quoi not in ("fond", "modele", "scene"):
+    if quoi not in ("fond", "modele", "scene", "profil"):
         raise Refus("Image inconnue.")
     if h.params.get("supprimer"):
         db.ex(f"UPDATE comptes SET {quoi}_fichier = '' WHERE id = ?", (c["id"],))
@@ -704,7 +726,7 @@ ROUTES = [
     ("GET", r"/api/comptes", r_comptes, ADMIN),
     ("POST", r"/api/comptes/synchroniser", r_comptes_sync, ADMIN),
     ("POST", r"/api/comptes/([A-Za-z0-9_-]+)", r_compte_modifier, ADMIN),
-    ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/image/(fond|modele|scene)", r_compte_image, ADMIN),
+    ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/image/(fond|modele|scene|profil)", r_compte_image, ADMIN),
     ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/prompt/(scene)", r_compte_prompt, ADMIN),
     ("POST", r"/api/comptes/([A-Za-z0-9_-]+)/copier", r_compte_copier, ADMIN),
     ("GET", r"/api/reglages", r_reglages, ADMIN),

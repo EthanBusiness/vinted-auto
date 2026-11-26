@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS comptes (
     modele_fichier TEXT DEFAULT '', modele_description TEXT DEFAULT '',
     prompt_fond TEXT DEFAULT '', prompt_modele TEXT DEFAULT '',
     scene_fichier TEXT DEFAULT '', scene_description TEXT DEFAULT '', prompt_scene TEXT DEFAULT '',
+    profil_fichier TEXT DEFAULT '',
     prochain_creneau REAL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS couts (
@@ -91,7 +92,8 @@ def cx() -> sqlite3.Connection:
 
 # Colonnes ajoutées après la première version (les anciennes bases sont complétées au démarrage)
 COLONNES_AJOUTEES = {
-    "comptes": {"scene_fichier": "TEXT DEFAULT ''", "scene_description": "TEXT DEFAULT ''", "prompt_scene": "TEXT DEFAULT ''"},
+    "comptes": {"scene_fichier": "TEXT DEFAULT ''", "scene_description": "TEXT DEFAULT ''", "prompt_scene": "TEXT DEFAULT ''",
+                "profil_fichier": "TEXT DEFAULT ''"},
     "annonces": {"attributs": "TEXT DEFAULT '{}'"},   # autres champs Vinted de la catégorie (ex : longueur de jupe)
 }
 

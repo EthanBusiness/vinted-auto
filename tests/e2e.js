@@ -100,6 +100,13 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
     const demandeScene = appels.slice(-1)[0].corps.messages[0].content;
     if (!/UNE femme dans SON décor/.test(demandeScene) || !/jardin, terrasse en bois/.test(demandeScene)) throw new Error("demande de scène : " + demandeScene);
     ok("Compte : une seule scène (fond + modèle ensemble) importée, décrite par l'IA (vision) + prompt de scène généré");
+    const promptProfil = await page.textContent("#c-vt-1 .grille2 >> nth=1");
+    if (!/photo de profil/.test(promptProfil) || !/même femme/.test(promptProfil) || !/CARRÉ/.test(promptProfil)) throw new Error("prompt de profil : " + promptProfil);
+    const [fcp] = await Promise.all([page.waitForEvent("filechooser"), page.click('#c-vt-1 .depot[data-quoi="profil"]')]);
+    await fcp.setFiles(png);
+    await jusqua(async () => (await page.$('#c-vt-1 .depot.rempli[data-quoi="profil"] img')), "photo de profil enregistrée");
+    if (await page.$("#c-vt-1 [data-cpp='profil']")) throw new Error("le prompt de profil reste affiché alors que la photo est là");
+    ok("Compte : photo de profil déposée ; avant, le prompt Gemini pour la créer (même femme, même décor, style Insta) était proposé");
     await page.screenshot({ path: path.join(SORTIE, "2-comptes.png"), fullPage: true });
 
     // ---- Ajouter des liens
