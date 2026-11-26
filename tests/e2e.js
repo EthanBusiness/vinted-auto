@@ -89,6 +89,13 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
     const ico = await page.evaluate(() => fetch("/static/icone.ico").then((r) => r.status + " " + r.headers.get("content-type")));
     if (!ico.startsWith("200")) throw new Error("icône : " + ico);
     ok("Réglages : aide pour retrouver le logiciel (Bureau, menu Démarrer, barre des tâches) + icône du site");
+    const acces = await page.evaluate(() => fetch("/api/acces").then((r) => r.json()));
+    if (acces.ouvert !== false || acces.mdp_employee !== false) throw new Error("accès employée : " + JSON.stringify(acces));
+    await jusqua(async () => (await page.textContent("#acces")).includes("mot de passe enregistré"), "aide accès employée");
+    await page.evaluate(() => blocAcces({ mdp_employee: true, ouvert: true, port: 8000, local: ["192.168.1.20"], tailscale: ["100.101.102.103"], tailscale_nom: "pc-ethan" }));
+    const txtAcces = await page.textContent("#acces");
+    if (!txtAcces.includes("http://100.101.102.103:8000") || !txtAcces.includes("http://192.168.1.20:8000") || !(await page.$("#copierMsg"))) throw new Error("bloc accès : " + txtAcces);
+    ok("Réglages : accès employée guidé (mot de passe, lien wifi, lien Tailscale, message à copier)");
 
     // ---- Comptes : fond + modèle
     await page.goto(URL_SITE + "#comptes");
