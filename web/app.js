@@ -577,13 +577,22 @@ function carteCompte(c) {
     "<p class=\"aide\">Colle ce prompt dans Gemini (outil « Créer des images », modèle « Pro »), télécharge l'image, puis glisse-la dans la zone à gauche.</p>" +
     "<label>Ce qu'on voit sur la scène (rempli par l'IA quand tu déposes l'image, modifiable)</label>" +
     '<textarea rows="2" data-desc="scene_description" placeholder="ex : terrasse en bois, haie verte ; femme fine, peau claire, cheveux châtains, bracelets fins">' + esc(c.scene_description) + "</textarea>" +
-    '<button data-save>💾 Enregistrer la description</button></div></div></div>';
+    '<button data-save>💾 Enregistrer la description</button></div></div>' +
+    '<div class="sep"></div><div class="grille2"><div><h3>🙂 Photo de profil du compte</h3>' +
+    '<div class="depot profil ' + (c.profil_fichier ? "rempli" : "") + '" data-quoi="profil">' + (c.profil_fichier ? '<img src="' + img(c.profil_fichier) + '">' : "<b>Glisse ici la photo de profil</b><span>ou clique pour la choisir</span>") + "</div>" +
+    (c.profil_fichier ? '<div class="ligne"><a class="bouton petit" href="' + img(c.profil_fichier) + '" download>⬇️ Télécharger</a><button class="danger petit" data-suppr="profil">Retirer l\'image</button></div>' : "") +
+    "</div><div>" + (c.profil_fichier ? '<p class="aide">Mets cette photo sur le profil Vinted du compte (Profil › Modifier le profil › Photo).</p>' :
+      "<h3>✨ Pas encore de photo de profil ? Génère-la dans Gemini</h3>" +
+      (f ? '<p class="aide">1. <a href="' + img(f) + '" download>Télécharge la scène du compte</a> et joins-la dans Gemini. 2. Colle ce prompt (outil « Créer des images », modèle « Pro »). 3. Glisse la photo obtenue dans la zone à gauche.</p>'
+         : '<p class="aide">Ajoute d\'abord la scène du compte (au-dessus) : la photo de profil reprend la même femme et le même décor.</p>') +
+      '<div class="prompt">' + esc(c.prompt_profil) + '</div><button data-cpp="profil" class="principal" style="margin-top:6px">📋 Copier ce prompt</button>') +
+    "</div></div></div>";
 }
 
 function brancherCompte(c) {
   var el = document.getElementById("c-" + c.id);
   var url = "/api/comptes/" + encodeURIComponent(c.id);
-  function maj() { chargerComptes().then(function (cs) { var n = cs.filter(function (x) { return x.id === c.id; })[0]; var tmp = document.createElement("div"); tmp.innerHTML = carteCompte(n); el.replaceWith(tmp.firstChild); brancherCompte(n); }); }
+  function maj() { chargerComptes().then(function (cs) { var n = cs.filter(function (x) { return x.id === c.id; })[0]; var actuel = document.getElementById("c-" + c.id); if (!n || !actuel) return; var tmp = document.createElement("div"); tmp.innerHTML = carteCompte(n); actuel.replaceWith(tmp.firstChild); brancherCompte(n); }); }
   $$(".depot", el).forEach(function (z) {
     zoneDepot(z, function (f) {
       if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return toast("Format refusé : JPG, PNG ou WEBP.");
