@@ -646,6 +646,13 @@ function pageReglages() {
       '<div class="carte"><h2>👩‍💻 Accès de ton employée (à distance)</h2><p class="aide">Sur ce PC, tu n\'as pas besoin de mot de passe. Pour que ton employée se connecte depuis chez elle, choisis les mots de passe ici (l\'installation de Tailscale pour l\'accès à distance viendra ensuite).</p>' +
       cle("EMPLOYEE_PASSWORD", "Ton employée ne verra que la page Photos.", "") + cle("ADMIN_PASSWORD", "Pour toi, si tu ouvres le site depuis un autre appareil.", "") +
       '<button class="principal" id="sauverM">💾 Enregistrer les mots de passe</button></div>' +
+      '<div class="carte"><h2>🖥️ Ouvrir Vinted Auto facilement</h2>' +
+      '<p>Tu as 3 façons de l\'ouvrir, sans chercher le dossier :</p><ol class="etapes">' +
+      "<li>Double-clique sur l'icône <b>Vinted Auto</b> (le cintre bleu) sur ton <b>Bureau</b>.</li>" +
+      "<li>Appuie sur la touche <b>Windows</b> du clavier, tape <b>vinted</b> puis <b>Entrée</b>.</li>" +
+      "<li>Le plus pratique : fais un <b>clic droit</b> sur l'icône du Bureau › <b>Épingler à la barre des tâches</b> (sous Windows 11, clique d'abord sur « Afficher plus d'options »). L'icône reste alors en bas de l'écran, à côté de Chrome.</li></ol>" +
+      '<p class="aide">Si le site est déjà ouvert, l\'icône rouvre simplement la page dans le navigateur. Tu peux aussi ajouter la page aux favoris de Chrome (étoile ☆ dans la barre d\'adresse) : <code>http://localhost:8000</code>.</p>' +
+      '<div id="demarrage"></div></div>' +
       '<div class="carte"><h2>🧩 Extension Chrome</h2><p><a href="#extension">Installer ou vérifier l\'extension « lecteur Shein »</a></p></div>' +
       '<div class="carte"><h2>⬆️ Mise à jour</h2><p id="mv" class="aide">Version installée : ' + esc(ETAT.etat.version) + "</p><button id=\"maj\">⬆️ Mettre à jour maintenant</button></div>";
     function enregistrerCles(btn) {
@@ -668,6 +675,16 @@ function pageReglages() {
           .catch(function (e) { toast("✖ " + e.message, 9000); b.disabled = false; b.textContent = "Tester"; });
       };
     });
+    api("GET", "/api/demarrage-auto").then(function (s) {
+      if (!s.disponible) return;
+      $("#demarrage").innerHTML = '<label><input type="checkbox" id="demAuto" style="width:auto"' + (s.actif ? " checked" : "") + "> Lancer Vinted Auto tout seul quand j'allume le PC</label>" +
+        '<p class="aide">La fenêtre noire démarre réduite en bas de l\'écran (ne la ferme pas : c\'est elle qui fait tourner le site). Ensuite, l\'icône ouvre la page tout de suite.</p>';
+      $("#demAuto").onchange = function () {
+        var c = this; c.disabled = true;
+        api("POST", "/api/demarrage-auto", { actif: c.checked }).then(function (r) { c.checked = r.actif; toast(r.actif ? "✔ Vinted Auto se lancera tout seul à l'allumage du PC." : "✔ Démarrage automatique retiré."); })
+          .catch(function (e) { c.checked = !c.checked; toast(e.message, 7000); }).then(function () { c.disabled = false; });
+      };
+    }).catch(function () { /* rien */ });
     api("GET", "/api/maj").then(function (m) { if (m.disponible) $("#mv").innerHTML = "Version installée : " + esc(m.version) + " · dernière version : <b>" + esc(m.disponible) + "</b>" + (m.disponible !== m.version ? ' <span class="ok">(nouvelle version disponible)</span>' : " (à jour)"); }).catch(function () { /* rien */ });
     $("#maj").onclick = function () {
       var b = this; b.disabled = true; b.textContent = "Téléchargement…";

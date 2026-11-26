@@ -83,6 +83,12 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
       await attendre(300);
     }
     ok("Les boutons « Tester » marchent (Claude, Scalency, Supabase)");
+    if (!(await page.textContent("#r")).includes("Épingler à la barre des tâches")) throw new Error("aide pour ouvrir le logiciel absente");
+    const dem = await page.evaluate(() => fetch("/api/demarrage-auto").then((r) => r.json()));
+    if (dem.disponible !== false) throw new Error("démarrage auto hors Windows : " + JSON.stringify(dem));
+    const ico = await page.evaluate(() => fetch("/static/icone.ico").then((r) => r.status + " " + r.headers.get("content-type")));
+    if (!ico.startsWith("200")) throw new Error("icône : " + ico);
+    ok("Réglages : aide pour retrouver le logiciel (Bureau, menu Démarrer, barre des tâches) + icône du site");
 
     // ---- Comptes : fond + modèle
     await page.goto(URL_SITE + "#comptes");

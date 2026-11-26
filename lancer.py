@@ -83,23 +83,6 @@ def site_deja_lance(port) -> bool:
         return False
 
 
-def raccourci_bureau():
-    """Crée (ou met à jour) un raccourci « Vinted Auto » sur le Bureau."""
-    if os.name != "nt":
-        return
-    try:
-        bat = str(CODE / "lancer.bat").replace("'", "''")
-        dossier = str(CODE).replace("'", "''")
-        ps = ("$d=[Environment]::GetFolderPath('Desktop');"
-              "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'Vinted Auto.lnk'));"
-              f"$s.TargetPath='{bat}';$s.WorkingDirectory='{dossier}';"
-              "$s.IconLocation='%SystemRoot%\\System32\\shell32.dll,13';$s.Save()")
-        subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
-    except Exception:  # noqa
-        pass
-
-
 def main():
     print("\n  ==========================================")
     print("              VINTED AUTO")
@@ -122,7 +105,10 @@ def main():
             erreur(f"La mise à jour a échoué : {e}\nVérifie ta connexion internet.")
         pause_et_quitter(0)
 
+    demarrage = "--demarrage" in sys.argv     # lancé tout seul à l'allumage du PC : pas de navigateur
     if site_deja_lance(port):
+        if demarrage:
+            return
         titre("Le site est déjà lancé : j'ouvre le navigateur.")
         import webbrowser
         webbrowser.open(f"http://localhost:{port}/")
@@ -131,10 +117,11 @@ def main():
 
     exe = python_env(DONNEES)
     installer_outils(exe, DONNEES)
-    raccourci_bureau()
+    from vinted_auto import raccourcis
+    raccourcis.installer()
 
     plantages = []
-    ouvrir = True
+    ouvrir = not demarrage
     while True:
         env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
         if not ouvrir:
