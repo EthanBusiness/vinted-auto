@@ -10,6 +10,9 @@ Tu colles un lien Shein (et tu choisis la taille), le site te donne : la descrip
    - Si Windows affiche « Windows a protégé votre ordinateur » : **Informations complémentaires** › **Exécuter quand même**.
    - La première fois, il prépare Python (1 à 2 minutes). Ensuite le site s'ouvre tout seul dans ton navigateur.
    - Un raccourci **Vinted Auto** est créé sur ton Bureau : la prochaine fois, double-clique simplement dessus.
+   - Il est aussi dans le menu Démarrer : touche **Windows**, tape **vinted**, **Entrée**.
+   - Le plus pratique : clic droit sur l'icône du Bureau › **Épingler à la barre des tâches** (Windows 11 : « Afficher plus d'options » d'abord).
+   - Dans **Réglages**, tu peux cocher « Lancer Vinted Auto tout seul quand j'allume le PC ».
 4. Dans le site, page **Réglages** : colle tes clés (Claude, Scalency, Supabase) et clique sur **Tester** pour chacune.
 5. Installe l'extension Chrome « lecteur Shein » : le site te guide (page **Extension**, 2 minutes).
 6. Page **Comptes** : ajoute la scène de chaque compte (la femme dans son décor, en une seule image), ou génère un prompt pour la créer dans Gemini.

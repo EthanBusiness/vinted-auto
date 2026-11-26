@@ -17,7 +17,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import atelier, config, db, ia, maj, paquet, photos, scalency
+from . import atelier, config, db, ia, maj, paquet, photos, raccourcis, scalency
 from .config import CODE, DONNEES, IMAGES, VERSION
 
 WEB = CODE / "web"
@@ -687,6 +687,19 @@ def _redemarrer():
     SERVEUR["s"].shutdown()
 
 
+def r_demarrage(h):
+    h.json({"disponible": raccourcis.disponible() and h.est_local(), "actif": raccourcis.demarrage_actif()})
+
+
+def r_demarrage_changer(h):
+    if not h.est_local():
+        raise Refus("Ce réglage se fait seulement sur le PC du site.")
+    actif = bool(h.corps_json().get("actif"))
+    if not raccourcis.demarrage_auto(actif):
+        raise Refus("Windows a refusé de créer le raccourci de démarrage.")
+    h.json({"ok": True, "actif": raccourcis.demarrage_actif()})
+
+
 def r_ouvrir_extension(h):
     copier_extension()
     if os.name == "nt" and h.est_local():
@@ -735,6 +748,8 @@ ROUTES = [
     ("GET", r"/api/maj", r_maj_info, ADMIN),
     ("POST", r"/api/maj", r_maj, ADMIN),
     ("POST", r"/api/extension/ouvrir", r_ouvrir_extension, ADMIN),
+    ("GET", r"/api/demarrage-auto", r_demarrage, ADMIN),
+    ("POST", r"/api/demarrage-auto", r_demarrage_changer, ADMIN),
 ]
 SERVEUR = {}
 
