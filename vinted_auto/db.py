@@ -73,7 +73,8 @@ REGLAGES_DEFAUT = {
     "prix_min": "6",
     "etat_id": "2",              # Très bon état
     "colis_id": "1",             # Petit
-    "espacement_min": "20",      # minutes entre 2 publications d'un même compte
+    "espacement_min": "20",
+    "chrome_profil": "",         # dossier du profil Chrome où ouvrir le site (vide = navigateur par défaut)      # minutes entre 2 publications d'un même compte
     "publier_auto": "0",         # publier dès que les photos sont validées
     "eur_par_usd": "0.92",
 }

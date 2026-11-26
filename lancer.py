@@ -110,8 +110,8 @@ def main():
         if demarrage:
             return
         titre("Le site est déjà lancé : j'ouvre le navigateur.")
-        import webbrowser
-        webbrowser.open(f"http://localhost:{port}/")
+        from vinted_auto import navigateur
+        navigateur.ouvrir(f"http://localhost:{port}/")
         time.sleep(2)
         return
 

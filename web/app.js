@@ -652,6 +652,9 @@ function pageReglages() {
       "<li>Appuie sur la touche <b>Windows</b> du clavier, tape <b>vinted</b> puis <b>Entrée</b>.</li>" +
       "<li>Le plus pratique : fais un <b>clic droit</b> sur l'icône du Bureau › <b>Épingler à la barre des tâches</b> (sous Windows 11, clique d'abord sur « Afficher plus d'options »). L'icône reste alors en bas de l'écran, à côté de Chrome.</li></ol>" +
       '<p class="aide">Si le site est déjà ouvert, l\'icône rouvre simplement la page dans le navigateur. Tu peux aussi ajouter la page aux favoris de Chrome (étoile ☆ dans la barre d\'adresse) : <code>http://localhost:8000</code>.</p>' +
+      (d.profils_chrome && d.profils_chrome.length ? '<label>Ouvrir le site dans ce profil Chrome</label><select id="profilChrome"><option value="">Navigateur par défaut de Windows</option>' +
+        d.profils_chrome.map(function (p) { return '<option value="' + esc(p.dossier) + '"' + (p.dossier === g.chrome_profil ? " selected" : "") + ">" + esc(p.nom + (p.email ? " (" + p.email + ")" : "")) + "</option>"; }).join("") +
+        '</select><p class="aide">Choisis ton profil : le site s\'y ouvrira à chaque fois (icône, démarrage). Pense à installer l\'extension « lecteur Shein » dans ce profil.</p>' : "") +
       '<div id="demarrage"></div></div>' +
       '<div class="carte"><h2>🧩 Extension Chrome</h2><p><a href="#extension">Installer ou vérifier l\'extension « lecteur Shein »</a></p></div>' +
       '<div class="carte"><h2>⬆️ Mise à jour</h2><p id="mv" class="aide">Version installée : ' + esc(ETAT.etat.version) + "</p><button id=\"maj\">⬆️ Mettre à jour maintenant</button></div>";
@@ -675,6 +678,12 @@ function pageReglages() {
           .catch(function (e) { toast("✖ " + e.message, 9000); b.disabled = false; b.textContent = "Tester"; });
       };
     });
+    if ($("#profilChrome")) $("#profilChrome").onchange = function () {
+      var sel = this;
+      api("POST", "/api/chrome-profil", { profil: sel.value }).then(function (r) {
+        toast(sel.value ? (r.chrome ? "✔ Enregistré : le site s'ouvre maintenant dans ce profil Chrome (tu peux fermer cet onglet)." : "Enregistré, mais Chrome est introuvable : le navigateur par défaut sera utilisé.") : "✔ Le site s'ouvrira dans le navigateur par défaut.", 9000);
+      }).catch(function (e) { toast(e.message, 7000); });
+    };
     api("GET", "/api/demarrage-auto").then(function (s) {
       if (!s.disponible) return;
       $("#demarrage").innerHTML = '<label><input type="checkbox" id="demAuto" style="width:auto"' + (s.actif ? " checked" : "") + "> Lancer Vinted Auto tout seul quand j'allume le PC</label>" +

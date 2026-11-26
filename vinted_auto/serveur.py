@@ -11,13 +11,12 @@ import sys
 import threading
 import time
 import traceback
-import webbrowser
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import atelier, config, db, ia, maj, paquet, photos, raccourcis, scalency
+from . import atelier, config, db, ia, maj, navigateur, paquet, photos, raccourcis, scalency
 from .config import CODE, DONNEES, IMAGES, VERSION
 
 WEB = CODE / "web"
@@ -636,7 +635,7 @@ def r_reglages(h):
     cles = {k: {"libelle": lib, "rempli": bool(config.get(k)),
                 "apercu": config.masquer(config.get(k)) if k in config.SECRETES else config.get(k)}
             for k, lib in config.CLES.items()}
-    h.json({"cles": cles, "reglages": db.reglages()})
+    h.json({"cles": cles, "reglages": db.reglages(), "profils_chrome": navigateur.profils() if h.est_local() else []})
 
 
 def r_reglages_enregistrer(h):
@@ -700,6 +699,17 @@ def r_demarrage_changer(h):
     h.json({"ok": True, "actif": raccourcis.demarrage_actif()})
 
 
+def r_chrome_essayer(h):
+    if not h.est_local():
+        raise Refus("Ce réglage se fait seulement sur le PC du site.")
+    profil = str(h.corps_json().get("profil") or "")
+    if profil and profil not in {p["dossier"] for p in navigateur.profils()}:
+        raise Refus("Profil Chrome inconnu.")
+    db.set_reglage("chrome_profil", profil)
+    ok = navigateur.ouvrir("http://localhost:" + str(int(config.get("PORT", "8000") or 8000)) + "/#reglages", profil)
+    h.json({"ok": True, "chrome": ok})
+
+
 def r_ouvrir_extension(h):
     copier_extension()
     if os.name == "nt" and h.est_local():
@@ -749,6 +759,7 @@ ROUTES = [
     ("POST", r"/api/maj", r_maj, ADMIN),
     ("POST", r"/api/extension/ouvrir", r_ouvrir_extension, ADMIN),
     ("GET", r"/api/demarrage-auto", r_demarrage, ADMIN),
+    ("POST", r"/api/chrome-profil", r_chrome_essayer, ADMIN),
     ("POST", r"/api/demarrage-auto", r_demarrage_changer, ADMIN),
 ]
 SERVEUR = {}
@@ -783,7 +794,7 @@ def main():
     print("   Pour arrêter le site : ferme cette fenêtre.")
     print("  ------------------------------------------------------------\n")
     if not os.environ.get("VINTED_AUTO_SANS_NAVIGATEUR"):
-        threading.Timer(0.8, lambda: webbrowser.open(adresse)).start()
+        threading.Timer(0.8, lambda: navigateur.ouvrir(adresse)).start()
     try:
         s.serve_forever(poll_interval=0.5)
     except KeyboardInterrupt:

@@ -100,10 +100,13 @@ async function apiGet(chemin) { const r = await fetch(URL_SITE.slice(0, -1) + ch
     await jusqua(async () => (await page.$('#c-vt-1 .depot.rempli[data-quoi="scene"] img')), "scène enregistrée");
     await page.fill('#c-vt-1 [data-idee="scene"]', "jardin, terrasse en bois, femme mince");
     await page.click('#c-vt-1 [data-gen="scene"]');
-    await jusqua(async () => (await page.$("#c-vt-1 .prompt")), "prompt de scène généré");
-    const appels = (await (await fetch(`http://127.0.0.1:${FAUX}/journal`)).json()).anthropic;
+    // (la carte affiche déjà le prompt de la photo de profil : on attend la vraie demande de scène)
+    const appels = await jusqua(async () => {
+      const j = (await (await fetch(`http://127.0.0.1:${FAUX}/journal`)).json()).anthropic;
+      return j.some(x => /jardin, terrasse en bois/.test(JSON.stringify(x.corps.messages))) ? j : null;
+    }, "prompt de scène généré");
     if (!appels.some(x => Array.isArray(x.corps.messages[0].content) && x.corps.messages[0].content[0].type === "image")) throw new Error("la scène n'a pas été décrite par l'IA");
-    const demandeScene = appels.slice(-1)[0].corps.messages[0].content;
+    const demandeScene = (appels.filter(x => typeof x.corps.messages[0].content === "string").slice(-1)[0] || { corps: { messages: [{ content: "" }] } }).corps.messages[0].content;
     if (!/UNE femme dans SON décor/.test(demandeScene) || !/jardin, terrasse en bois/.test(demandeScene)) throw new Error("demande de scène : " + demandeScene);
     ok("Compte : une seule scène (fond + modèle ensemble) importée, décrite par l'IA (vision) + prompt de scène généré");
     const promptProfil = await page.textContent("#c-vt-1 .grille2 >> nth=1");
