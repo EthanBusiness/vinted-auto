@@ -9,7 +9,7 @@ import os
 import threading
 from pathlib import Path
 
-VERSION = "3.6.0"
+VERSION = "3.6.1"
 DEPOT_GITHUB = "EthanBusiness/vinted-auto"
 
 CODE = Path(__file__).resolve().parent.parent
